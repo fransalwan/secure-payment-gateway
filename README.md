@@ -1,12 +1,13 @@
 # Secure Payment Gateway (`secure-payment-gateway`)
 
 > **Production-Grade, High-Performance Payment Processing & Double-Entry Ledger Engine**  
-> Built with Go, PostgreSQL, and Redis. Engineered with a zero-trust cybersecurity posture and high-throughput concurrency control.
+> Built with Go, PostgreSQL, and Redis. Engineered with a zero-trust cybersecurity posture, high-throughput concurrency control, and an interactive web dashboard.
 
 [![Go Version](https://img.shields.io/badge/Go-1.27%2B-blue.svg)](https://golang.org)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%2016-blue.svg)](https://www.postgresql.org/)
 [![Cache & Lock](https://img.shields.io/badge/Cache%20%26%20Lock-Redis%207-red.svg)](https://redis.io/)
 [![Security](https://img.shields.io/badge/Security-AES--256--GCM%20%7C%20HMAC--SHA256-green.svg)](#cybersecurity-architecture)
+[![Dashboard UI](https://img.shields.io/badge/UI-Interactive%20Fintech%20Dashboard-emerald.svg)](#-interactive-fintech-dashboard--security-playground)
 
 ---
 
@@ -18,6 +19,25 @@ Dalam industri perbankan dan fintech, integritas finansial dan kecepatan transak
 1. **Zero-Trust Cybersecurity**: Enkripsi data sensitif di level aplikasi (AES-256-GCM), autentikasi request berbasis tanda tangan kriptografis (HMAC-SHA256), mitigasi Replay Attack, serta rantai audit tamper-evident.
 2. **Extreme Concurrency & Performance**: Arsitektur akuntansi berpasangan (*Double-Entry Bookkeeping*), algoritma pengurutan lock deterministik pencegah deadlock, dan *Distributed Idempotency Engine*.
 3. **Resilient Architecture**: Pola *Transactional Outbox Pattern* dengan `SKIP LOCKED` untuk pengiriman event asinkron tanpa *dual-write anomaly*.
+4. **Interactive Playground UI**: Web Dashboard siap demo untuk memvisualisasikan buku besar (*double-entry ledger*), audit chain, serta simulasi serangan siber secara interaktif langsung dari browser.
+
+---
+
+## 🖥️ Interactive Fintech Dashboard & Security Playground
+
+Aplikasi dilengkapi dengan dashboard visual interaktif yang dapat diakses langsung di browser saat server berjalan:
+
+📍 **URL Dashboard**: `http://localhost:8080/` atau `http://localhost:8080/dashboard`
+
+### Fitur Unggulan Dashboard:
+* **Live Payment & Transfer Simulator**: Melakukan transfer dana riil dengan kalkulasi otomatis `X-Signature` (HMAC-SHA256), `X-Timestamp`, dan `X-Idempotency-Key`.
+* **Security & Attack Playground Controls**:
+  * **Simulasi MITM (Tamper Signature)**: Memanipulasi tanda tangan payload untuk mengamati penolakan otomatis oleh middleware keamanan (`401 Unauthorized`).
+  * **Simulasi Replay Attack**: Mengirimkan request dengan timestamp basi (> 5 menit) untuk menguji penolakan anti-replay.
+  * **Uji Idempotensi**: Menembak request berulang dengan key yang sama untuk memverifikasi pencegahan *double-deduct*.
+* **Field-Level AES-256-GCM Inspector**: Form pendaftaran rekening nasabah yang mengenkripsi data identitas (NIK / Card Number) ke bentuk ciphertext hex sebelum disimpan ke database.
+* **Double-Entry Ledger Audit Trail**: Visualisasi tabel mutasi seimbang $\sum \text{Debit} = \sum \text{Credit}$ dengan badge warna realtime dan saldo pasca-transaksi (*balance_after*).
+* **Tamper-Evident Audit Chain Explorer**: Visualisasi rantai blok SHA-256 (`Previous Hash` $\rightarrow$ `Current Hash`) yang membuktikan rekaman transaksi tidak dimanipulasi dari dalam database.
 
 ---
 
@@ -25,7 +45,7 @@ Dalam industri perbankan dan fintech, integritas finansial dan kecepatan transak
 
 ```
                       +-----------------------------+
-                      |   Merchant / Client App     |
+                      |   Merchant / Client / Web UI|
                       +--------------+--------------+
                                      |  (HTTPS + HMAC-SHA256 Signature)
                                      v
@@ -67,14 +87,14 @@ Dalam industri perbankan dan fintech, integritas finansial dan kecepatan transak
 ## 🛡️ Cybersecurity Highlights
 
 ### 1. Constant-Time HMAC-SHA256 Request Verification
-Setiap transaksi wajib membawa header:
+Setiap transaksi transfer wajib membawa header:
 * `X-Signature`: Tanda tangan hex `HMAC-SHA256(timestamp + "." + body, secret_key)`
 * `X-Timestamp`: Unix timestamp saat request dibuat
 
 Sistem memverifikasi signature menggunakan algoritma **Constant-Time Comparison** (`hmac.Equal`) untuk menggagalkan **Timing Attacks** (peretas mengukur selisih waktu respons mikrodetik untuk menebak byte signature).
 
 ### 2. Anti-Replay Attack Protection
-Request yang dicegat oleh pihak ketiga di jaringan publik tidak dapat dikirim ulang berulang kali. Header `X-Timestamp` dievaluasi terhadap clock server dengan toleransi batas maksimal $\pm 300$ detik (5 menit).
+Request yang dicegat oleh pihak ketiga di jaringan publik tidak dapat dikirim ulang berulang kali. Header `X-Timestamp` dievaluasi terhadap clock server dengan batas toleransi maksimal $\pm 300$ detik (5 menit).
 
 ### 3. Field-Level Authenticated Encryption (AES-256-GCM)
 Nomor identitas (NIK / Card Number) dienkripsi sebelum masuk ke database menggunakan **AES-256-GCM**. Nonce 12-byte digenerasi secara acak untuk setiap enkripsi, menghasilkan ciphertext unik bahkan untuk data identitas yang identik. Jika ada manipulasi langsung pada baris database, tag otentikasi GCM akan gagal mendekripsi.
@@ -101,9 +121,9 @@ secondLockID := req.DestinationAccountID
 if strings.Compare(firstLockID.String(), secondLockID.String()) > 0 {
     firstLockID, secondLockID = secondLockID, firstLockID
 }
-// Selalu lock firstLockID, baru kemudian secondLockID
+// Selalu lock firstLockID terlebih dahulu, baru kemudian secondLockID
 ```
-Hal ini menjamin seluruh proses di seluruh thread selalu meminta lock dalam urutan yang identik, secara matematis **mengeliminasi deadlock**.
+Hal ini menjamin seluruh proses di seluruh thread selalu meminta lock dalam urutan yang identik, secara matematis **mengeliminasi circular wait deadlock**.
 
 ### 2. Distributed Idempotency State Machine
 Mencegah terjadinya saldo terpotong dua kali (*Double Deduction*):
@@ -117,6 +137,22 @@ Uang tidak pernah diubah secara sembarangan. Setiap transaksi selalu menghasilka
 * **DEBIT** pada rekening pengirim.
 * **CREDIT** pada rekening penerima.
 * Nilai mutasi selalu berimbang ($\sum \text{Debit} - \sum \text{Credit} = 0$).
+
+---
+
+## 📡 Daftar REST API Endpoints
+
+| Method | Endpoint | Keterangan | Autentikasi / Header |
+|---|---|---|---|
+| `GET` | `/` atau `/dashboard` | Interactive Fintech Dashboard Web UI | Publik |
+| `GET` | `/health` | Health Check & Latency Probe | Publik |
+| `GET` | `/api/v1/accounts` | List semua rekening terdaftar | Publik |
+| `POST` | `/api/v1/accounts` | Buat rekening baru (Enkripsi AES-256-GCM) | Publik |
+| `GET` | `/api/v1/accounts/{id}` | Detail saldo & rekening | Publik |
+| `POST` | `/api/v1/transfers` | Eksekusi transfer saldo atomik berpasangan | `X-Signature`, `X-Timestamp`, `X-Idempotency-Key` |
+| `GET` | `/api/v1/ledger` | Riwayat mutasi Double-Entry Ledger | Publik |
+| `GET` | `/api/v1/audit-logs` | Rantai Audit Tamper-Evident SHA-256 | Publik |
+| `POST` | `/api/v1/security/sign` | Helper pembuat signature untuk testing UI | Publik |
 
 ---
 
@@ -177,7 +213,7 @@ outbox_events (
 * [Go 1.22+](https://golang.org)
 * [Docker & Docker Compose](https://www.docker.com/) (atau PostgreSQL & Redis lokal)
 
-### 2. Jalankan Database & Cache
+### 2. Jalankan Database & Cache (Docker)
 ```bash
 docker compose up -d
 ```
@@ -191,42 +227,11 @@ go test -v -race ./...
 ```bash
 go run ./cmd/api
 ```
-Server akan aktif di `http://localhost:8080`.
+Server akan aktif di `http://localhost:8080`. Buka browser untuk melihat dashboard interaktif.
 
-### 5. Jalankan Background Outbox Worker
+### 5. Jalankan Background Outbox Worker (Terminal Terpisah)
 ```bash
 go run ./cmd/worker
-```
-
----
-
-## 🧪 Contoh Request API
-
-### 1. Buat Rekening Baru
-```bash
-curl -X POST http://localhost:8080/api/v1/accounts \
-  -H "Content-Type: application/json" \
-  -d '{
-    "account_number": "ACC-IDR-1001",
-    "holder_name": "Budi Santoso",
-    "identity_data": "NIK:3171012345670001;PAN:4111222233334444",
-    "initial_balance": 10000000,
-    "currency": "IDR"
-  }'
-```
-
-### 2. Generate Signature untuk Transfer
-Gunakan helper CLI bawaan untuk menghasilkan header keamanan yang valid:
-```bash
-go run ./scripts/generate_signature.go
-```
-
-Output:
-```text
-=== Generated Security Headers ===
-X-Timestamp: 1776123456
-X-Signature: 3c5e8f4...
-X-Idempotency-Key: idemp-1776123456
 ```
 
 ---
@@ -248,7 +253,7 @@ k6 run scripts/k6_load_test.js
 
 ## 💼 Poin Diskusi Saat Technical Interview
 
-Ketika ditanya mengenai proyek ini saat interview:
+Ketika ditanya mengenai proyek ini saat wawancara teknis:
 1. **Tentang Race Condition**: Jelaskan bagaimana pengurutan UUID deterministik memecahkan persoalan circular wait deadlock pada PostgreSQL `SELECT FOR UPDATE`.
 2. **Tentang Data Loss**: Jelaskan peran Transactional Outbox Pattern yang mencatat event dalam satu transaksi ACID yang sama dengan mutasi saldo, mencegah masalah *Dual-Write*.
 3. **Tentang Keamanan Finansial**: Jelaskan mengapa enkripsi AES-256-GCM dipilih dibanding CBC (karena integritas terotentikasi), dan pentingnya `hmac.Equal` untuk menolak side-channel timing attack.
