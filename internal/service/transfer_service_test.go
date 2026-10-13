@@ -84,3 +84,4 @@ func TestTransferService_IdempotencyLifecycle(t *testing.T) {
 		t.Fatalf("expected '%s', got '%s'", string(savedResponse), string(cachedBytes))
 	}
 }
+

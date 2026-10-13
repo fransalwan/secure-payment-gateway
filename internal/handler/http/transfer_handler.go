@@ -52,3 +52,23 @@ func (h *TransferHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 
 	response.OK(w, "transfer processed and settled successfully", result)
 }
+
+func (h *TransferHandler) ListLedger(w http.ResponseWriter, r *http.Request) {
+	entries, err := h.svc.ListLedgerEntries(r.Context())
+	if err != nil {
+		response.InternalServerError(w, "failed to list ledger entries")
+		return
+	}
+	response.OK(w, "ledger entries retrieved successfully", entries)
+}
+
+func (h *TransferHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) {
+	logs, err := h.svc.ListAuditLogs(r.Context())
+	if err != nil {
+		response.InternalServerError(w, "failed to list audit logs")
+		return
+	}
+	response.OK(w, "audit logs retrieved successfully", logs)
+}
+
+

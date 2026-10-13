@@ -83,3 +83,13 @@ func (s *TransferService) TransferFunds(
 
 	return resp, nil
 }
+
+func (s *TransferService) ListLedgerEntries(ctx context.Context) ([]*domain.LedgerEntry, error) {
+	return s.transferRepo.ListLedgerEntries(ctx, 50)
+}
+
+func (s *TransferService) ListAuditLogs(ctx context.Context) ([]*domain.AuditLog, error) {
+	return s.transferRepo.ListAuditLogs(ctx, 50)
+}
+
+

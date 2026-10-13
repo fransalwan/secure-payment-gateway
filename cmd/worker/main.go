@@ -82,3 +82,4 @@ func processOutboxBatch(ctx context.Context, repo *postgresrepo.OutboxRepository
 		}
 	}
 }
+

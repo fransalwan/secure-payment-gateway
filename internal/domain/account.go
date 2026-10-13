@@ -33,3 +33,4 @@ type AccountRepository interface {
 	GetByAccountNumber(ctx context.Context, accNum string) (*Account, error)
 	GetByIDWithLock(ctx context.Context, id uuid.UUID) (*Account, error)
 }
+

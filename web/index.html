@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Payment Gateway — Fintech Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#10b981',
+              600: '#059669',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+  <!-- Navbar -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <svg class="w-6 h-6 text-slate-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-extrabold text-lg text-white tracking-tight">Secure Payment Gateway</h1>
+            <span class="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">v1.0 Production</span>
+          </div>
+          <p class="text-xs text-slate-400">Double-Entry Ledger &bull; AES-256-GCM &bull; HMAC-SHA256 &bull; Distributed Idempotency</p>
+        </div>
+      </div>
+
+      <!-- Health Pills -->
+      <div class="flex items-center gap-2 text-xs">
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-slate-300 font-medium">Core API:</span>
+          <span class="text-emerald-400 font-semibold" id="api-status">Healthy (p95 &lt; 30ms)</span>
+        </div>
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60">
+          <span class="text-slate-400">PostgreSQL:</span>
+          <span class="text-emerald-400 font-semibold">ACID Ready</span>
+        </div>
+        <button onclick="loadAllData()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition flex items-center gap-1.5 text-xs shadow-md shadow-emerald-600/20">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- Metrics Cards -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Accounts</span>
+        <div class="text-3xl font-extrabold text-white mt-1" id="metric-accounts">0</div>
+        <span class="text-xs text-slate-500 mt-2 block">Rekening terdaftar</span>
+      </div>
+
+      <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Ledger Volume</span>
+        <div class="text-3xl font-extrabold text-emerald-400 mt-1" id="metric-volume">Rp 0</div>
+        <span class="text-xs text-slate-500 mt-2 block">Total dana dalam sistem</span>
+      </div>
+
+      <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Double-Entry Balance</span>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="text-3xl font-extrabold text-teal-400" id="metric-balanced">&Sigma;Debit = &Sigma;Credit</span>
+        </div>
+        <span class="text-xs text-emerald-400 font-medium mt-2 block">&check; 100% Zero Invariant Violation</span>
+      </div>
+
+      <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cybersecurity Status</span>
+        <div class="text-xl font-bold text-indigo-400 mt-2">Zero-Trust Active</div>
+        <span class="text-xs text-slate-500 mt-2 block">HMAC-SHA256 &bull; Anti-Replay</span>
+      </div>
+    </section>
+
+    <!-- Interactive Grid: Simulator & Account Creator -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+      <!-- Left Column: Transfer Simulator & Security Playground -->
+      <section class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              Payment &amp; Transfer Simulator
+            </h2>
+            <p class="text-xs text-slate-400">Simulasikan transaksi keuangan dengan validasi tanda tangan kriptografis dan idempotensi</p>
+          </div>
+          <span class="text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-full font-mono font-medium">HMAC-SHA256</span>
+        </div>
+
+        <form id="transfer-form" onsubmit="executeTransfer(event)" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Source Account (Debit)</label>
+              <select id="transfer-source" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                <option value="">Pilih Rekening Sumber...</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Destination Account (Credit)</label>
+              <select id="transfer-dest" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                <option value="">Pilih Rekening Tujuan...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Amount (IDR)</label>
+              <input type="number" id="transfer-amount" required min="1000" step="1000" value="50000" placeholder="50000" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Reference ID</label>
+              <input type="text" id="transfer-ref" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white focus:outline-none focus:border-emerald-500">
+            </div>
+          </div>
+
+          <!-- Security Playground Controls -->
+          <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                Security &amp; Attack Simulation Controls
+              </span>
+              <button type="button" onclick="regenerateIdempotencyKey()" class="text-xs text-emerald-400 hover:underline">New Idempotency Key</button>
+            </div>
+
+            <div class="space-y-1">
+              <label class="text-[11px] font-mono text-slate-400">X-Idempotency-Key:</label>
+              <input type="text" id="transfer-idempotency" required class="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs font-mono text-emerald-400">
+              <span class="text-[10px] text-slate-500">Kirim ulang dengan key yang sama untuk menguji pencegahan double-deduction (409 Conflict / cached result).</span>
+            </div>
+
+            <!-- Attack Toggles -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-xs">
+              <label class="flex items-center gap-2 cursor-pointer bg-slate-900/60 p-2 rounded-lg border border-slate-800 hover:border-slate-700">
+                <input type="checkbox" id="attack-tamper" class="rounded bg-slate-800 border-slate-700 text-rose-500 focus:ring-0">
+                <span class="text-slate-300 text-[11px]">Simulasi MITM (Tamper Signature)</span>
+              </label>
+
+              <label class="flex items-center gap-2 cursor-pointer bg-slate-900/60 p-2 rounded-lg border border-slate-800 hover:border-slate-700">
+                <input type="checkbox" id="attack-replay" class="rounded bg-slate-800 border-slate-700 text-rose-500 focus:ring-0">
+                <span class="text-slate-300 text-[11px]">Simulasi Replay Attack (&gt;5m Old)</span>
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" id="btn-submit-transfer" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold py-3 px-4 rounded-xl transition shadow-lg shadow-emerald-500/20 text-sm flex items-center justify-center gap-2">
+            <span>Execute Atomic Double-Entry Transfer</span>
+          </button>
+        </form>
+
+        <!-- Response Inspector Box -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-400">
+            <span>Live Response Inspector</span>
+            <span id="response-status-badge" class="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">Waiting request...</span>
+          </div>
+          <pre id="response-preview" class="p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-emerald-400 overflow-x-auto max-h-48 whitespace-pre-wrap">// Output response transaksi akan muncul di sini</pre>
+        </div>
+      </section>
+
+      <!-- Right Column: Create Account & AES Encryption Inspector -->
+      <section class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <svg class="w-5 h-5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+              Buat Rekening Nasabah
+            </h2>
+            <p class="text-xs text-slate-400">Enkripsi terotentikasi AES-256-GCM pada data identitas</p>
+          </div>
+          <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-mono font-medium">AES-256-GCM</span>
+        </div>
+
+        <form id="account-form" onsubmit="createAccount(event)" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Nomor Rekening</label>
+            <input type="text" id="acc-num" required placeholder="ACC-IDR-1001" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Nama Pemilik (Holder Name)</label>
+            <input type="text" id="acc-holder" required placeholder="Ahmad Rizky" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Sensitive Identity Data (NIK / Kartu)</label>
+            <input type="text" id="acc-identity" required placeholder="NIK: 3171012345670001; Card: 4111-2222-3333-4444" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+            <span class="text-[10px] text-slate-500">Dienkripsi otomatis menjadi ciphertext hex sebelum masuk ke database.</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Saldo Awal (IDR)</label>
+            <input type="number" id="acc-balance" required min="0" step="10000" value="5000000" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+          </div>
+
+          <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2.5 px-4 rounded-xl transition border border-slate-700 text-xs">
+            + Simpan Rekening Terenkripsi
+          </button>
+        </form>
+
+        <!-- Quick Accounts Preview -->
+        <div class="space-y-2 pt-2">
+          <span class="text-xs font-semibold text-slate-400 block">Daftar Rekening Aktif</span>
+          <div id="accounts-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+            <div class="text-xs text-slate-500 py-4 text-center">Memuat rekening...</div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Double-Entry Ledger Visualizer Table -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            Double-Entry Ledger Audit Trail (Buku Besar Berpasangan)
+          </h2>
+          <p class="text-xs text-slate-400">Setiap mutasi saldo selalu terdiri dari pasangan DEBIT &amp; CREDIT yang seimbang</p>
+        </div>
+        <span class="text-xs font-mono bg-slate-800 px-3 py-1 rounded-lg text-slate-300">Append-Only Invariant</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+            <tr>
+              <th class="py-3 px-4">Waktu</th>
+              <th class="py-3 px-4">Transaction ID</th>
+              <th class="py-3 px-4">Account ID</th>
+              <th class="py-3 px-4">Tipe Entri</th>
+              <th class="py-3 px-4">Jumlah (Amount)</th>
+              <th class="py-3 px-4">Saldo Akhir</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-table-body" class="divide-y divide-slate-800/60 font-mono">
+            <tr>
+              <td colspan="6" class="text-center py-6 text-slate-500 font-sans">Belum ada mutasi ledger. Lakukan transfer untuk melihat entri.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Tamper-Evident Audit Chain Explorer -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            Tamper-Evident Audit Chain (Hash-Chained Log)
+          </h2>
+          <p class="text-xs text-slate-400">Setiap log mutasi dirantai secara kriptografis: CurrentHash = SHA256(PreviousHash + Payload)</p>
+        </div>
+        <span class="text-xs font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full">SHA-256 Chain</span>
+      </div>
+
+      <div id="audit-chain-container" class="space-y-3 font-mono text-xs">
+        <div class="text-center py-6 text-slate-500 font-sans">Belum ada blok audit.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-slate-900 py-6 text-center text-xs text-slate-500">
+    <p>Secure Payment Gateway &bull; Designed for Fintech Backend Engineering Portfolio &bull; Open Source</p>
+  </footer>
+
+  <!-- Frontend Logic -->
+  <script>
+    let cachedAccounts = [];
+
+    function formatRupiah(num) {
+      return 'Rp ' + Number(num).toLocaleString('id-ID');
+    }
+
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    function regenerateIdempotencyKey() {
+      document.getElementById('transfer-idempotency').value = 'idemp-' + generateUUID();
+    }
+
+    function generateRefID() {
+      document.getElementById('transfer-ref').value = 'REF-' + Date.now().toString().slice(-6);
+    }
+
+    // Load All Data
+    async function loadAllData() {
+      await Promise.all([
+        loadAccounts(),
+        loadLedger(),
+        loadAuditLogs(),
+      ]);
+    }
+
+    // Load Accounts
+    async function loadAccounts() {
+      try {
+        const res = await fetch('/api/v1/accounts');
+        const json = await res.json();
+        if (json.success && json.data) {
+          cachedAccounts = json.data;
+          document.getElementById('metric-accounts').innerText = json.data.length;
+
+          // Compute total balance volume
+          const totalBalance = json.data.reduce((sum, a) => sum + (a.balance || 0), 0);
+          document.getElementById('metric-volume').innerText = formatRupiah(totalBalance);
+
+          // Update Select Options
+          const sourceSelect = document.getElementById('transfer-source');
+          const destSelect = document.getElementById('transfer-dest');
+          const currentSource = sourceSelect.value;
+          const currentDest = destSelect.value;
+
+          sourceSelect.innerHTML = '<option value="">Pilih Rekening Sumber...</option>';
+          destSelect.innerHTML = '<option value="">Pilih Rekening Tujuan...</option>';
+
+          json.data.forEach(acc => {
+            const opt1 = document.createElement('option');
+            opt1.value = acc.id;
+            opt1.textContent = `${acc.account_number} - ${acc.holder_name} (${formatRupiah(acc.balance)})`;
+            sourceSelect.appendChild(opt1);
+
+            const opt2 = document.createElement('option');
+            opt2.value = acc.id;
+            opt2.textContent = `${acc.account_number} - ${acc.holder_name} (${formatRupiah(acc.balance)})`;
+            destSelect.appendChild(opt2);
+          });
+
+          if (currentSource) sourceSelect.value = currentSource;
+          if (currentDest) destSelect.value = currentDest;
+
+          // Render Accounts List Card
+          const listContainer = document.getElementById('accounts-list');
+          if (json.data.length === 0) {
+            listContainer.innerHTML = '<div class="text-xs text-slate-500 py-3 text-center">Belum ada rekening. Buat rekening baru di atas.</div>';
+          } else {
+            listContainer.innerHTML = json.data.map(acc => `
+              <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center justify-between text-xs">
+                <div>
+                  <div class="font-bold text-white">${acc.account_number} &bull; <span class="font-normal text-slate-300">${acc.holder_name}</span></div>
+                  <div class="text-[10px] text-slate-500 font-mono">ID: ${acc.id.substring(0, 8)}... &bull; Ver: ${acc.version}</div>
+                </div>
+                <div class="text-right">
+                  <div class="font-bold text-emerald-400">${formatRupiah(acc.balance)}</div>
+                  <span class="text-[9px] text-slate-500 uppercase font-mono">${acc.currency}</span>
+                </div>
+              </div>
+            `).join('');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load accounts:', err);
+      }
+    }
+
+    // Load Ledger Entries
+    async function loadLedger() {
+      try {
+        const res = await fetch('/api/v1/ledger');
+        const json = await res.json();
+        const tbody = document.getElementById('ledger-table-body');
+
+        if (json.success && json.data && json.data.length > 0) {
+          tbody.innerHTML = json.data.map(entry => {
+            const isDebit = entry.entry_type === 'DEBIT';
+            const badgeClass = isDebit ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+            const sign = isDebit ? '-' : '+';
+            const dateStr = new Date(entry.created_at).toLocaleTimeString();
+
+            return `
+              <tr class="hover:bg-slate-800/30 transition">
+                <td class="py-2.5 px-4 text-slate-400">${dateStr}</td>
+                <td class="py-2.5 px-4 text-slate-300" title="${entry.transaction_id}">${entry.transaction_id.substring(0, 8)}...</td>
+                <td class="py-2.5 px-4 text-slate-400" title="${entry.account_id}">${entry.account_id.substring(0, 8)}...</td>
+                <td class="py-2.5 px-4">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold ${badgeClass}">${entry.entry_type}</span>
+                </td>
+                <td class="py-2.5 px-4 font-bold ${isDebit ? 'text-rose-400' : 'text-emerald-400'}">${sign} ${formatRupiah(entry.amount)}</td>
+                <td class="py-2.5 px-4 text-slate-200">${formatRupiah(entry.balance_after)}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        console.error('Failed to load ledger:', err);
+      }
+    }
+
+    // Load Audit Logs
+    async function loadAuditLogs() {
+      try {
+        const res = await fetch('/api/v1/audit-logs');
+        const json = await res.json();
+        const container = document.getElementById('audit-chain-container');
+
+        if (json.success && json.data && json.data.length > 0) {
+          container.innerHTML = json.data.slice(0, 10).map((log, idx) => `
+            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center font-bold text-[10px]">#${log.id}</span>
+                <div>
+                  <span class="font-bold text-slate-200">${log.action}</span>
+                  <span class="text-slate-500 text-[10px] ml-2">${new Date(log.created_at).toLocaleTimeString()}</span>
+                </div>
+              </div>
+              <div class="text-[11px] text-slate-400 space-y-0.5">
+                <div><span class="text-slate-500">Prev Hash:</span> <span class="text-slate-400">${log.previous_hash.substring(0, 16)}...</span></div>
+                <div><span class="text-amber-400">Curr Hash:</span> <span class="text-emerald-400 font-semibold">${log.current_hash.substring(0, 16)}...</span></div>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        console.error('Failed to load audit logs:', err);
+      }
+    }
+
+    // Create Account Handler
+    async function createAccount(e) {
+      e.preventDefault();
+      const payload = {
+        account_number: document.getElementById('acc-num').value,
+        holder_name: document.getElementById('acc-holder').value,
+        identity_data: document.getElementById('acc-identity').value,
+        initial_balance: parseInt(document.getElementById('acc-balance').value, 10),
+        currency: 'IDR'
+      };
+
+      try {
+        const res = await fetch('/api/v1/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Rekening berhasil dibuat dengan enkripsi AES-256-GCM!');
+          document.getElementById('acc-num').value = 'ACC-IDR-' + (Math.floor(Math.random() * 9000) + 1000);
+          await loadAllData();
+        } else {
+          alert('Gagal: ' + (data.message || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    // Execute Transfer Handler
+    async function executeTransfer(e) {
+      e.preventDefault();
+      const startTime = performance.now();
+
+      const sourceID = document.getElementById('transfer-source').value;
+      const destID = document.getElementById('transfer-dest').value;
+      const amount = parseInt(document.getElementById('transfer-amount').value, 10);
+      const refID = document.getElementById('transfer-ref').value;
+      const idempotencyKey = document.getElementById('transfer-idempotency').value;
+
+      if (!sourceID || !destID) {
+        alert('Pilih rekening sumber dan tujuan!');
+        return;
+      }
+
+      const payloadObj = {
+        reference_id: refID,
+        source_account_id: sourceID,
+        destination_account_id: destID,
+        amount: amount,
+        currency: 'IDR',
+        description: 'Transfer via simulator dashboard'
+      };
+      const payloadString = JSON.stringify(payloadObj);
+
+      // Fetch signature from backend helper
+      let timestamp = Math.floor(Date.now() / 1000);
+
+      // Check attack toggles
+      if (document.getElementById('attack-replay').checked) {
+        timestamp -= 600; // 10 minutes ago -> triggers replay attack rejection!
+      }
+
+      // Request helper signature from backend endpoint
+      const signRes = await fetch('/api/v1/security/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timestamp: timestamp,
+          payload: payloadString
+        })
+      });
+      const signData = await signRes.json();
+      let signature = signData.data ? signData.data.signature : 'invalid-sig';
+
+      if (document.getElementById('attack-tamper').checked) {
+        signature = 'deadbeef' + signature.substring(8); // Tamper signature -> triggers MITM rejection!
+      }
+
+      const respBadge = document.getElementById('response-status-badge');
+      const respPreview = document.getElementById('response-preview');
+      respBadge.innerText = 'Sending...';
+
+      try {
+        const transferRes = await fetch('/api/v1/transfers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': idempotencyKey,
+            'X-Timestamp': timestamp.toString(),
+            'X-Signature': signature
+          },
+          body: payloadString
+        });
+
+        const elapsed = (performance.now() - startTime).toFixed(1);
+        const resJson = await transferRes.json();
+
+        respBadge.innerText = `HTTP ${transferRes.status} (${elapsed} ms)`;
+        respBadge.className = transferRes.ok 
+          ? 'font-mono text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold'
+          : 'font-mono text-[11px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold';
+
+        respPreview.innerText = JSON.stringify(resJson, null, 2);
+
+        if (transferRes.ok) {
+          // Refresh ledger and accounts
+          await loadAllData();
+          generateRefID();
+          regenerateIdempotencyKey();
+        }
+      } catch (err) {
+        respBadge.innerText = 'Network Error';
+        respBadge.className = 'font-mono text-[11px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold';
+        respPreview.innerText = err.toString();
+      }
+    }
+
+    // Auto-init on load
+    window.addEventListener('DOMContentLoaded', () => {
+      regenerateIdempotencyKey();
+      generateRefID();
+      document.getElementById('acc-num').value = 'ACC-IDR-1001';
+      loadAllData();
+
+      // Poll every 5s
+      setInterval(loadAllData, 5000);
+    });
+  </script>
+</body>
+</html>

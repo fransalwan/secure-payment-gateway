@@ -32,3 +32,4 @@ type OutboxRepository interface {
 	MarkProcessed(ctx context.Context, id uuid.UUID) error
 	MarkFailed(ctx context.Context, id uuid.UUID, errMsg string) error
 }
+

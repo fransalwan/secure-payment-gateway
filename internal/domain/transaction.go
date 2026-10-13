@@ -46,3 +46,4 @@ type TransferResponseDTO struct {
 	DestBalance   int64             `json:"dest_balance_after"`
 	CreatedAt     time.Time         `json:"created_at"`
 }
+

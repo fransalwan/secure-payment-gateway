@@ -53,3 +53,4 @@ func HMACAuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 		})
 	}
 }
+

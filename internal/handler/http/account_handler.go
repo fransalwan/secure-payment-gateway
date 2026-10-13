@@ -54,3 +54,14 @@ func (h *AccountHandler) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 	response.OK(w, "account retrieved successfully", acc)
 }
+
+func (h *AccountHandler) ListAccounts(w http.ResponseWriter, r *http.Request) {
+	accounts, err := h.svc.ListAccounts(r.Context())
+	if err != nil {
+		response.InternalServerError(w, "failed to list accounts")
+		return
+	}
+	response.OK(w, "accounts retrieved successfully", accounts)
+}
+
+

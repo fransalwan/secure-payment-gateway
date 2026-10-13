@@ -13,3 +13,4 @@ func CalculateAuditHash(previousHash string, payload []byte) string {
 	hasher.Write([]byte(data))
 	return hex.EncodeToString(hasher.Sum(nil))
 }
+

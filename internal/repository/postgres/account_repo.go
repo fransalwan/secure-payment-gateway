@@ -102,3 +102,43 @@ func (r *AccountRepository) GetByAccountNumber(ctx context.Context, accNum strin
 	}
 	return &acc, nil
 }
+
+func (r *AccountRepository) List(ctx context.Context, limit int) ([]*domain.Account, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	query := `
+		SELECT id, account_number, holder_name, encrypted_identity, balance, currency, version, created_at, updated_at
+		FROM accounts
+		ORDER BY created_at DESC
+		LIMIT $1
+	`
+	rows, err := r.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list accounts: %w", err)
+	}
+	defer rows.Close()
+
+	var accounts []*domain.Account
+	for rows.Next() {
+		var acc domain.Account
+		err := rows.Scan(
+			&acc.ID,
+			&acc.AccountNumber,
+			&acc.HolderName,
+			&acc.EncryptedIdentity,
+			&acc.Balance,
+			&acc.Currency,
+			&acc.Version,
+			&acc.CreatedAt,
+			&acc.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan account: %w", err)
+		}
+		accounts = append(accounts, &acc)
+	}
+	return accounts, nil
+}
+
+

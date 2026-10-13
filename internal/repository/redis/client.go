@@ -28,3 +28,4 @@ func NewRedisClient(cfg *config.Config) (*redis.Client, error) {
 	slog.Info("Redis connection established successfully", "addr", cfg.RedisAddr)
 	return client, nil
 }
+

@@ -204,3 +204,78 @@ func (r *TransferRepository) ExecuteDoubleEntryTransfer(
 		CreatedAt:     now,
 	}, nil
 }
+
+func (r *TransferRepository) ListLedgerEntries(ctx context.Context, limit int) ([]*domain.LedgerEntry, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	query := `
+		SELECT id, transaction_id, account_id, entry_type, amount, balance_after, created_at
+		FROM ledger_entries
+		ORDER BY created_at DESC
+		LIMIT $1
+	`
+	rows, err := r.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list ledger entries: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []*domain.LedgerEntry
+	for rows.Next() {
+		var e domain.LedgerEntry
+		err := rows.Scan(
+			&e.ID,
+			&e.TransactionID,
+			&e.AccountID,
+			&e.EntryType,
+			&e.Amount,
+			&e.BalanceAfter,
+			&e.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan ledger entry: %w", err)
+		}
+		entries = append(entries, &e)
+	}
+	return entries, nil
+}
+
+func (r *TransferRepository) ListAuditLogs(ctx context.Context, limit int) ([]*domain.AuditLog, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	query := `
+		SELECT id, entity_type, entity_id, action, payload, previous_hash, current_hash, created_at
+		FROM audit_logs
+		ORDER BY id DESC
+		LIMIT $1
+	`
+	rows, err := r.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list audit logs: %w", err)
+	}
+	defer rows.Close()
+
+	var logs []*domain.AuditLog
+	for rows.Next() {
+		var a domain.AuditLog
+		err := rows.Scan(
+			&a.ID,
+			&a.EntityType,
+			&a.EntityID,
+			&a.Action,
+			&a.Payload,
+			&a.PreviousHash,
+			&a.CurrentHash,
+			&a.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan audit log: %w", err)
+		}
+		logs = append(logs, &a)
+	}
+	return logs, nil
+}
+
+

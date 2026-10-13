@@ -72,3 +72,9 @@ func (s *AccountService) GetAccount(ctx context.Context, id uuid.UUID) (*domain.
 func (s *AccountService) GetAccountByNumber(ctx context.Context, accNum string) (*domain.Account, error) {
 	return s.repo.GetByAccountNumber(ctx, accNum)
 }
+
+func (s *AccountService) ListAccounts(ctx context.Context) ([]*domain.Account, error) {
+	return s.repo.List(ctx, 50)
+}
+
+

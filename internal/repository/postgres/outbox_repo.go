@@ -75,3 +75,42 @@ func (r *OutboxRepository) MarkFailed(ctx context.Context, id uuid.UUID, errMsg 
 	_, err := r.pool.Exec(ctx, query, errMsg, id)
 	return err
 }
+
+func (r *OutboxRepository) ListAll(ctx context.Context, limit int) ([]*domain.OutboxEvent, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	query := `
+		SELECT id, event_type, payload, status, retry_count, last_error, created_at, processed_at
+		FROM outbox_events
+		ORDER BY created_at DESC
+		LIMIT $1
+	`
+	rows, err := r.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list outbox events: %w", err)
+	}
+	defer rows.Close()
+
+	var events []*domain.OutboxEvent
+	for rows.Next() {
+		var ev domain.OutboxEvent
+		err := rows.Scan(
+			&ev.ID,
+			&ev.EventType,
+			&ev.Payload,
+			&ev.Status,
+			&ev.RetryCount,
+			&ev.LastError,
+			&ev.CreatedAt,
+			&ev.ProcessedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan outbox event: %w", err)
+		}
+		events = append(events, &ev)
+	}
+	return events, nil
+}
+
+

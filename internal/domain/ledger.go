@@ -33,3 +33,4 @@ type AuditLog struct {
 	CurrentHash  string    `json:"current_hash"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
