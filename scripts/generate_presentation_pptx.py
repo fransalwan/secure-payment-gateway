@@ -590,3 +590,4 @@ Sekarang, mari kita beralih ke sesi live demo aplikasi di browser, atau kita bis
 if __name__ == "__main__":
     out_file = sys.argv[1] if len(sys.argv) > 1 else "Frans_Alwan_Purba_Payment_Gateway_Demo.pptx"
     create_presentation(out_file)
+

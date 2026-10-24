@@ -79,13 +79,19 @@
           </select>
         </div>
 
-        <!-- Real-Time Switch Latency Badge with Rolling Percentile -->
-        <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="text-slate-400 font-medium text-[11px]">Core Switch:</span>
-          <span class="text-emerald-400 font-mono font-bold text-[11px]" id="api-status">Healthy (2ms)</span>
-          <span class="text-slate-600 text-[10px] font-mono">|</span>
+        <!-- Real-Time Switch Latency Badge with Rolling Percentile & SVG Sparkline -->
+        <div class="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-slate-400 font-medium text-[11px]">Core Switch:</span>
+            <span class="text-emerald-400 font-mono font-bold text-[11px]" id="api-status">Healthy (2ms)</span>
+          </div>
+          <span class="text-slate-700 text-[10px] font-mono">|</span>
           <span class="text-slate-400 font-mono text-[10px]" id="api-p95" title="95th Percentile SLA">p95: 4ms</span>
+          <!-- Dynamic SVG Sparkline -->
+          <svg id="latency-sparkline" class="w-12 h-3.5 text-emerald-400 overflow-visible" viewBox="0 0 60 20">
+            <path id="sparkline-path" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M 0 14 L 10 12 L 20 16 L 30 8 L 40 10 L 50 6 L 60 4"></path>
+          </svg>
         </div>
 
         <button onclick="loadAllData()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium transition flex items-center gap-1.5 text-xs">
@@ -374,11 +380,17 @@
               <div>
                 <div class="flex items-center justify-between mb-1">
                   <span class="text-[11px] uppercase font-bold text-slate-400">Gateway Response Body</span>
-                  <button type="button" onclick="copyText(document.getElementById('response-preview').innerText, 'Response JSON')" class="text-slate-400 hover:text-emerald-400 transition text-[10px] flex items-center gap-1">
-                    <span>📋 Copy JSON</span>
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="copyAsCurl()" class="text-slate-400 hover:text-indigo-400 transition text-[10px] flex items-center gap-1 font-mono font-medium" title="Generate and copy valid cURL command with HMAC signature">
+                      <span>⚡ Copy cURL</span>
+                    </button>
+                    <span class="text-slate-700">|</span>
+                    <button type="button" onclick="copyText(document.getElementById('response-preview').innerText, 'Response JSON')" class="text-slate-400 hover:text-emerald-400 transition text-[10px] flex items-center gap-1 font-mono font-medium">
+                      <span>📋 Copy JSON</span>
+                    </button>
+                  </div>
                 </div>
-                <pre id="response-preview" class="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl text-xs font-mono text-emerald-400 overflow-x-auto max-h-52 whitespace-pre-wrap custom-scroll">// Response JSON dari backend gateway akan muncul di sini</pre>
+                <div id="response-preview" class="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl text-xs font-mono text-slate-400 overflow-x-auto max-h-52 whitespace-pre-wrap custom-scroll leading-relaxed">// Response JSON dari backend gateway akan muncul di sini</div>
               </div>
             </div>
           </div>
@@ -580,7 +592,7 @@
           </div>
 
           <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
               <div>
                 <h3 class="text-base font-bold text-white flex items-center gap-2">
                   <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
@@ -588,7 +600,18 @@
                 </h3>
                 <p class="text-xs text-slate-400">Setiap mutasi saldo selalu tercatat sebagai pasangan DEBIT &amp; CREDIT</p>
               </div>
-              <span class="text-xs font-mono bg-slate-800 px-2.5 py-1 rounded-md text-slate-300">Append-Only</span>
+
+              <!-- Live Filter & Search Controls -->
+              <div class="flex items-center gap-2 flex-wrap">
+                <div class="relative">
+                  <input type="text" id="ledger-search-input" oninput="filterLedgerTable()" placeholder="Cari Tx ID / Nominal..." class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono w-36 sm:w-44">
+                </div>
+                <div class="flex items-center rounded-xl bg-slate-950 border border-slate-800 p-0.5 text-[10px] font-mono">
+                  <button type="button" onclick="setLedgerTypeFilter('ALL')" id="filter-btn-all" class="px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold transition">ALL</button>
+                  <button type="button" onclick="setLedgerTypeFilter('DEBIT')" id="filter-btn-debit" class="px-2 py-0.5 rounded-lg text-slate-400 hover:text-rose-400 transition">DEBIT</button>
+                  <button type="button" onclick="setLedgerTypeFilter('CREDIT')" id="filter-btn-credit" class="px-2 py-0.5 rounded-lg text-slate-400 hover:text-emerald-400 transition">CREDIT</button>
+                </div>
+              </div>
             </div>
 
             <div class="overflow-x-auto">
@@ -845,43 +868,84 @@
       }
     }
 
+    let currentLedgerFilter = 'ALL';
+
+    function setLedgerTypeFilter(type) {
+      currentLedgerFilter = type;
+      ['all', 'debit', 'credit'].forEach(t => {
+        const btn = document.getElementById('filter-btn-' + t);
+        if (!btn) return;
+        if (t.toUpperCase() === type) {
+          btn.className = 'px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold transition';
+        } else {
+          btn.className = 'px-2 py-0.5 rounded-lg text-slate-400 hover:text-white transition';
+        }
+      });
+      filterLedgerTable();
+    }
+
+    function filterLedgerTable() {
+      if (!cachedLedger) return;
+      const query = (document.getElementById('ledger-search-input')?.value || '').toLowerCase().trim();
+      const filtered = cachedLedger.filter(entry => {
+        const matchesType = currentLedgerFilter === 'ALL' || entry.entry_type === currentLedgerFilter;
+        const matchesQuery = !query || 
+          entry.transaction_id.toLowerCase().includes(query) || 
+          entry.amount.toString().includes(query) ||
+          (entry.balance_after && entry.balance_after.toString().includes(query));
+        return matchesType && matchesQuery;
+      });
+      renderLedgerTable(filtered);
+    }
+
+    function renderLedgerTable(entries) {
+      const tbody = document.getElementById('ledger-table-body');
+      if (!tbody) return;
+
+      if (!entries || entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-500 font-sans">Tidak ada mutasi ledger yang cocok dengan filter.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = entries.slice(0, 25).map(entry => {
+        const isDebit = entry.entry_type === 'DEBIT';
+        const badgeClass = isDebit ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        const sign = isDebit ? '-' : '+';
+        const dateStr = new Date(entry.created_at).toLocaleTimeString();
+
+        return `
+          <tr class="hover:bg-slate-800/30 transition">
+            <td class="py-2 px-3 text-slate-400 text-[11px]">${dateStr}</td>
+            <td class="py-2 px-3 text-slate-300 text-[11px]">
+              <div class="flex items-center gap-1">
+                <span>${entry.transaction_id.substring(0, 8)}...</span>
+                <button type="button" onclick="copyText('${entry.transaction_id}', 'Transaction ID')" class="text-slate-500 hover:text-slate-300 text-[10px]" title="Copy">📋</button>
+              </div>
+            </td>
+            <td class="py-2 px-3">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${badgeClass}">${entry.entry_type}</span>
+            </td>
+            <td class="py-2 px-3 font-bold ${isDebit ? 'text-rose-400' : 'text-emerald-400'}">${sign} ${formatRupiah(entry.amount)}</td>
+            <td class="py-2 px-3 text-slate-200">${formatRupiah(entry.balance_after)}</td>
+            <td class="py-2 px-3 text-right">
+              <button type="button" onclick="inspectTAccount('${entry.transaction_id}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-emerald-500/20 text-emerald-400 border border-slate-700 text-[10px] font-medium transition whitespace-nowrap">
+                🔍 T-Account
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
     // Load Ledger Entries
     async function loadLedger() {
       try {
         const res = await fetch('/api/v1/ledger');
         const json = await res.json();
-        const tbody = document.getElementById('ledger-table-body');
 
-        if (json.success && json.data && json.data.length > 0) {
+        if (json.success && json.data) {
           cachedLedger = json.data;
-          tbody.innerHTML = json.data.slice(0, 20).map(entry => {
-            const isDebit = entry.entry_type === 'DEBIT';
-            const badgeClass = isDebit ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-            const sign = isDebit ? '-' : '+';
-            const dateStr = new Date(entry.created_at).toLocaleTimeString();
-
-            return `
-              <tr class="hover:bg-slate-800/30 transition">
-                <td class="py-2 px-3 text-slate-400 text-[11px]">${dateStr}</td>
-                <td class="py-2 px-3 text-slate-300 text-[11px]">
-                  <div class="flex items-center gap-1">
-                    <span>${entry.transaction_id.substring(0, 8)}...</span>
-                    <button type="button" onclick="copyText('${entry.transaction_id}', 'Transaction ID')" class="text-slate-500 hover:text-slate-300 text-[10px]" title="Copy">📋</button>
-                  </div>
-                </td>
-                <td class="py-2 px-3">
-                  <span class="px-2 py-0.5 rounded text-[10px] font-bold ${badgeClass}">${entry.entry_type}</span>
-                </td>
-                <td class="py-2 px-3 font-bold ${isDebit ? 'text-rose-400' : 'text-emerald-400'}">${sign} ${formatRupiah(entry.amount)}</td>
-                <td class="py-2 px-3 text-slate-200">${formatRupiah(entry.balance_after)}</td>
-                <td class="py-2 px-3 text-right">
-                  <button type="button" onclick="inspectTAccount('${entry.transaction_id}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-emerald-500/20 text-emerald-400 border border-slate-700 text-[10px] font-medium transition whitespace-nowrap">
-                    🔍 T-Account
-                  </button>
-                </td>
-              </tr>
-            `;
-          }).join('');
+          filterLedgerTable();
         }
       } catch (err) {
         console.error('Failed to load ledger:', err);
@@ -1101,6 +1165,21 @@
 
     let rollingLatencies = [4, 6, 8, 3, 5];
 
+    function updateSparkline() {
+      const pathEl = document.getElementById('sparkline-path');
+      if (!pathEl || rollingLatencies.length < 2) return;
+      const recent = rollingLatencies.slice(-8);
+      const max = Math.max(...recent, 25);
+      const min = Math.min(...recent, 0);
+      const range = max - min || 1;
+      const points = recent.map((val, idx, arr) => {
+        const x = (idx / (arr.length - 1)) * 60;
+        const y = 18 - ((val - min) / range) * 15;
+        return `${x.toFixed(1)} ${y.toFixed(1)}`;
+      });
+      pathEl.setAttribute('d', 'M ' + points.join(' L '));
+    }
+
     function recordLatency(ms) {
       if (!ms || isNaN(ms)) return;
       rollingLatencies.push(Number(ms));
@@ -1112,6 +1191,62 @@
       if (p95El) {
         p95El.innerText = `p95: ${Math.round(p95)}ms`;
       }
+      updateSparkline();
+    }
+
+    // Syntax Highlight for JSON display
+    function syntaxHighlightJSON(json) {
+      if (typeof json !== 'string') {
+        json = JSON.stringify(json, null, 2);
+      }
+      json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        let cls = 'text-amber-400';
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            cls = 'text-sky-400 font-semibold';
+          } else {
+            cls = 'text-emerald-400';
+          }
+        } else if (/true|false/.test(match)) {
+          cls = 'text-purple-400 font-bold';
+        } else if (/null/.test(match)) {
+          cls = 'text-slate-500 italic';
+        }
+        return `<span class="${cls}">${match}</span>`;
+      });
+    }
+
+    // Copy as cURL command Generator
+    async function copyAsCurl() {
+      const sourceID = document.getElementById('transfer-source').value || 'acc-source-uuid';
+      const destID = document.getElementById('transfer-dest').value || 'acc-dest-uuid';
+      const amount = parseInt(document.getElementById('transfer-amount').value, 10) || 50000;
+      const refID = document.getElementById('transfer-ref').value || 'REF-' + Date.now().toString().slice(-6);
+      const idempotencyKey = document.getElementById('transfer-idempotency').value || 'idemp-' + generateUUID();
+
+      const payloadObj = {
+        reference_id: refID,
+        source_account_id: sourceID,
+        destination_account_id: destID,
+        amount: amount,
+        currency: 'IDR',
+        description: `Transfer via cURL (${currentMerchant})`
+      };
+      const payloadString = JSON.stringify(payloadObj);
+      const timestamp = Math.floor(Date.now() / 1000);
+      const merchantSecret = "spg-secret-hmac-key-for-signatures";
+      const signature = await computeHMACSHA256(merchantSecret, `${timestamp}.${payloadString}`);
+
+      const origin = window.location.origin;
+      const curlCmd = `curl -X POST "${origin}/api/v1/transfers" \\
+  -H "Content-Type: application/json" \\
+  -H "X-Timestamp: ${timestamp}" \\
+  -H "X-Idempotency-Key: ${idempotencyKey}" \\
+  -H "X-Signature: ${signature}" \\
+  -d '${payloadString}'`;
+
+      copyText(curlCmd, 'cURL Command');
     }
 
     function resetPipeline() {
@@ -1262,7 +1397,7 @@
           ? 'font-mono text-[11px] px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-400 font-bold'
           : 'font-mono text-[11px] px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 font-bold';
 
-        respPreview.innerText = JSON.stringify(resJson, null, 2);
+        respPreview.innerHTML = syntaxHighlightJSON(resJson);
 
         // Update Live Telemetry Grid
         document.getElementById('tel-rtt').innerText = `${elapsed} ms`;
@@ -1293,7 +1428,7 @@
       } catch (err) {
         respBadge.innerText = 'Network Error';
         respBadge.className = 'font-mono text-[11px] px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 font-bold';
-        respPreview.innerText = err.toString();
+        respPreview.innerHTML = `<span class="text-rose-400 font-bold">${err.toString()}</span>`;
         showToast('Error', err.toString(), 'error');
         updatePipeline(false, 'NETWORK_ERROR');
       }
