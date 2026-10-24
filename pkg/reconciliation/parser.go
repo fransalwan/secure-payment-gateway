@@ -85,3 +85,4 @@ func ParseBankSettlementCSV(r io.Reader) ([]*domain.BankSettlementRecord, error)
 
 	return records, nil
 }
+

@@ -72,3 +72,4 @@ type ReconciliationRepository interface {
 	ListBatches(ctx context.Context, limit int) ([]*ReconciliationBatch, error)
 	GetItemsByBatchID(ctx context.Context, batchID uuid.UUID) ([]*ReconciliationItem, error)
 }
+

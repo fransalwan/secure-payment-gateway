@@ -74,3 +74,4 @@ func TestReconciliationService_LiveMatching(t *testing.T) {
 		t.Errorf("expected MISSING_IN_GATEWAY, got %s", detail.Items[0].MatchStatus)
 	}
 }
+

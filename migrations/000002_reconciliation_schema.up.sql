@@ -33,3 +33,4 @@ CREATE TABLE IF NOT EXISTS reconciliation_items (
 CREATE INDEX IF NOT EXISTS idx_recon_items_batch_id ON reconciliation_items(batch_id);
 CREATE INDEX IF NOT EXISTS idx_recon_items_status ON reconciliation_items(match_status);
 CREATE INDEX IF NOT EXISTS idx_recon_items_ref_id ON reconciliation_items(reference_id);
+

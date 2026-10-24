@@ -117,3 +117,4 @@ REF-SAMPLE-MISMATCH,120000,SUCCESS,2026-10-25T01:10:00Z`
 	detail, _ := h.svc.GetBatchDetail(r.Context(), batch.ID)
 	response.OK(w, "sample reconciliation simulated successfully", detail)
 }
+
