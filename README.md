@@ -31,14 +31,17 @@ Aplikasi dilengkapi dengan dashboard visual interaktif yang dapat diakses langsu
 📍 **URL Dashboard**: `http://localhost:8080/` atau `http://localhost:8080/dashboard`
 
 ### Fitur Unggulan Dashboard:
-* **Live Payment & Transfer Simulator**: Melakukan transfer dana riil dengan kalkulasi otomatis `X-Signature` (HMAC-SHA256), `X-Timestamp`, dan `X-Idempotency-Key`.
+* **Financial State Machine Lifecycle Tracker**: Visualisasi 5 tahap pemrosesan atomik secara real-time (`AUTH` &rarr; `DEDUP` &rarr; `ACID LOCK` &rarr; `LEDGER` &rarr; `AUDIT`).
+* **High-Concurrency Race Attack Simulator**: Uji ketahanan konkurensi dengan menembakkan **5 request paralel serentak di milidetik yang sama** via `Promise.all()` (1 mutasi berhasil `200 OK`, 4 duplikasi diblokir `409 Conflict`).
+* **Bilateral T-Account Ledger Visualizer**: Inspeksi buku besar akuntansi berpasangan (*T-Account flow*) membuktikan invariant $\sum \text{Debit} - \sum \text{Credit} = \text{IDR } 0.00$.
+* **Automated 3-Way Bank Reconciliation Engine**: Penyelarasan mutasi settlement bank eksternal vs ledger internal (`MATCHED`, `DISCREPANCY_AMOUNT`, `MISSING_IN_GATEWAY`) dengan fitur ekspor CSV 1-klik.
+* **Cryptographic Tamper Simulator**: Tombol simulasi manipulasi data database yang seketika memicu alarm pelanggaran integritas rantai SHA-256.
 * **Security & Attack Playground Controls**:
   * **Simulasi MITM (Tamper Signature)**: Memanipulasi tanda tangan payload untuk mengamati penolakan otomatis oleh middleware keamanan (`401 Unauthorized`).
   * **Simulasi Replay Attack**: Mengirimkan request dengan timestamp basi (> 5 menit) untuk menguji penolakan anti-replay.
   * **Uji Idempotensi**: Menembak request berulang dengan key yang sama untuk memverifikasi pencegahan *double-deduct*.
 * **Field-Level AES-256-GCM Inspector**: Form pendaftaran rekening nasabah yang mengenkripsi data identitas (NIK / Card Number) ke bentuk ciphertext hex sebelum disimpan ke database.
-* **Double-Entry Ledger Audit Trail**: Visualisasi tabel mutasi seimbang $\sum \text{Debit} = \sum \text{Credit}$ dengan badge warna realtime dan saldo pasca-transaksi (*balance_after*).
-* **Tamper-Evident Audit Chain Explorer**: Visualisasi rantai blok SHA-256 (`Previous Hash` $\rightarrow$ `Current Hash`) yang membuktikan rekaman transaksi tidak dimanipulasi dari dalam database.
+* **Presenter Mode & Keyboard Shortcuts**: Tekan tombol angka `1` s/d `6` pada keyboard untuk memicu skenario demo seketika saat presentasi.
 
 ---
 
@@ -295,3 +298,14 @@ Ketika ditanya mengenai proyek ini saat wawancara teknis:
 1. **Tentang Race Condition**: Jelaskan bagaimana pengurutan UUID deterministik memecahkan persoalan circular wait deadlock pada PostgreSQL `SELECT FOR UPDATE`.
 2. **Tentang Data Loss**: Jelaskan peran Transactional Outbox Pattern yang mencatat event dalam satu transaksi ACID yang sama dengan mutasi saldo, mencegah masalah *Dual-Write*.
 3. **Tentang Keamanan Finansial**: Jelaskan mengapa enkripsi AES-256-GCM dipilih dibanding CBC (karena integritas terotentikasi), dan pentingnya `hmac.Equal` untuk menolak side-channel timing attack.
+
+---
+
+## 👨‍💻 Author & Engineering Contact
+
+* **Engineer**: Frans Alwan Purba
+* **Email**: [fransalwan55@gmail.com](mailto:fransalwan55@gmail.com)
+* **GitHub**: [github.com/fransalwan](https://github.com/fransalwan)
+* **Education**: Master of Computer Science in Artificial Intelligence @ Universitas Gadjah Mada (UGM)
+* **Focus**: High-Throughput Golang Backend, Financial Switches, Double-Entry Systems & Distributed Architecture
+

@@ -22,3 +22,4 @@ else
     echo "Or install ngrok: https://ngrok.com/download"
     exit 1
 fi
+

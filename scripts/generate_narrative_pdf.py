@@ -163,8 +163,8 @@ def build_pdf(filename="Secure_Payment_Gateway_Interview_Playbook.pdf"):
     # Title Banner Block
     banner_data = [
         [
-            Paragraph("<b>SECURE PAYMENT GATEWAY</b><br/><font size=10 color='#64748b'>CORE LEDGER & ZERO-TRUST FINANCIAL ENGINE</font>", title_style),
-            Paragraph("<b>PORTFOLIO NARRATION & TECHNICAL PLAYBOOK</b><br/><font size=8.5 color='#059669'>Panduan Strategis Menjawab Wawancara Tech Lead Fintech</font>", ParagraphStyle('RightSub', parent=subtitle_style, alignment=2))
+            Paragraph("<b>SECURE PAYMENT GATEWAY</b><br/><font size=10 color='#64748b'>CORE FINANCIAL SWITCH &amp; DOUBLE-ENTRY SETTLEMENT ENGINE</font><br/><font size=8.5 color='#0f172a'><b>Kandidat: Frans Alwan Purba</b> | Software Engineer (Golang Backend) | M.CS (AI) Universitas Gadjah Mada</font>", title_style),
+            Paragraph("<b>PORTFOLIO PLAYBOOK &amp; INTERVIEW CHEATSHEET</b><br/><font size=8 color='#059669'>Panduan Strategis Wawancara Tech Lead / VP of Engineering Fintech</font><br/><font size=7.5 color='#64748b'>fransalwan55@gmail.com &bull; github.com/fransalwan</font>", ParagraphStyle('RightSub', parent=subtitle_style, alignment=2))
         ]
     ]
     banner_table = Table(banner_data, colWidths=[310, 210])
@@ -176,18 +176,18 @@ def build_pdf(filename="Secure_Payment_Gateway_Interview_Playbook.pdf"):
     story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#059669"), spaceBefore=4, spaceAfter=12))
 
     # SECTION 1: ELEVATOR PITCH
-    story.append(Paragraph("1. ELEVATOR PITCH: CARA MEMPERKENALKAN PROYEK INI", h1_style))
+    story.append(Paragraph("1. ELEVATOR PITCH: CARA MEMPERKENALKAN DIRI & PROYEK INI", h1_style))
     story.append(Paragraph(
-        "Kunci utama saat interviewer berkata <i>'Ceritakan proyek paling berkesan yang pernah kamu bangun'</i> adalah <b>menghindari bercerita seperti membacakan tutorial</b>. Anda harus berbicara layaknya seorang engineer yang memecahkan masalah bisnis dan risiko finansial riil.",
+        "Kunci utama saat interviewer berkata <i>'Ceritakan tentang diri kamu dan proyek paling berkesan yang pernah kamu bangun'</i> adalah <b>menghubungkan latar belakang akademis & profesional dengan solusi engineering riil</b>. Hindari berbicara seperti membacakan tutorial.",
         body_style
     ))
 
     # Elevator Pitch Box
     pitch_30s = (
-        "<b>Versi 30 Detik (High-Level / HR / Opening):</b><br/>"
-        "<i>\"Saya membangun <b>secure-payment-gateway</b>, sebuah backend core payment & ledger engine menggunakan Go, PostgreSQL, dan Redis. "
-        "Fokus utama saya adalah memecahkan 2 tantangan krusial di fintech: <b>Integritas Finansial</b> (mencegah double-spending dan kebocoran saldo dengan Double-Entry Bookkeeping dan penguncian deterministik anti-deadlock) serta <b>Keamanan Tingkat Tinggi</b> "
-        "(enkripsi data identitas AES-256-GCM, verifikasi tanda tangan HMAC-SHA256 constant-time, dan distributed idempotency state machine).\"</i>"
+        "<b>Perkenalan Diri & Elevator Pitch 30 Detik (Opening):</b><br/>"
+        "<i>\"Nama saya <b>Frans Alwan Purba</b>. Saya seorang Software Engineer yang berfokus pada Go Backend & High-Availability Systems, serta saat ini menempuh studi Master Ilmu Komputer (AI) di Universitas Gadjah Mada (UGM).<br/>"
+        "Salah satu portfolio utama yang saya bangun adalah <b>secure-payment-gateway</b>, sebuah financial core switch & settlement engine berbasis Go, PostgreSQL, dan Redis. "
+        "Fokus utama saya adalah memecahkan tantangan krusial fintech: <b>Integritas Finansial</b> (Double-Entry Bookkeeping dan penguncian deterministik anti-deadlock), <b>Ketahanan Konkurensi Tinggi</b> (Distributed Idempotency Redis menolak race condition), serta <b>Penyelarasan Bank Otomatis</b> (Automated 3-Way Reconciliation).\"</i>"
     )
     pitch_table = Table([[Paragraph(pitch_30s, callout_style)]], colWidths=[520])
     pitch_table.setStyle(TableStyle([
@@ -203,12 +203,12 @@ def build_pdf(filename="Secure_Payment_Gateway_Interview_Playbook.pdf"):
 
     pitch_2m = (
         "<b>Versi 2 Menit (Deep Dive untuk Tech Lead / Principal Engineer):</b><br/>"
-        "<i>\"Banyak portfolio backend hanya melakukan operasi CRUD sederhana seperti UPDATE balance = balance - 100. Namun di industri payment, pola tersebut sangat rentan race condition dan tidak bisa diaudit.<br/>"
-        "Oleh karena itu, di proyek ini saya mengimplementasikan:<br/>"
+        "<i>\"Banyak kandidat backend hanya melakukan operasi CRUD sederhana seperti UPDATE balance = balance - 100. Namun di industri payment switch, pola tersebut sangat berbahaya karena rentan race condition dan tidak memiliki jejak audit.<br/>"
+        "Di secure-payment-gateway, saya merancang 4 pilar arsitektur perbankan:<br/>"
         "1. <b>Double-Entry Accounting</b>: Setiap transaksi wajib menghasilkan sepasang entri DEBIT dan CREDIT yang mutlak seimbang (&Sigma;Debit = &Sigma;Credit). Saldo riil akun terlindungi invariant matematis non-negatif.<br/>"
-        "2. <b>Deadlock Prevention</b>: Ketika Akun A mentransfer ke Akun B bersamaan dengan B ke A, database lock dapat memicu circular wait deadlock. Saya menyelesaikan ini dengan mengurutkan ID kedua akun secara leksikografis sebelum melakukan SELECT FOR UPDATE.<br/>"
-        "3. <b>Distributed Idempotency Engine</b>: Menggunakan Redis atomic SETNX dengan state machine (ACQUIRED, IN_PROGRESS, COMPLETED). Ini menjamin jika network timeout atau merchant menekan tombol retry 5 kali, saldo hanya terpotong tepat 1 kali.<br/>"
-        "4. <b>Zero-Trust Security & Outbox Pattern</b>: Data identitas dienkripsi dengan AES-256-GCM ber-nonce acak, request API diverifikasi via constant-time HMAC-SHA256 untuk menangkal timing attacks, dan event webhook diproses asinkron menggunakan Transactional Outbox Pattern dengan SKIP LOCKED.\"</i>"
+        "2. <b>Deterministic Lock Ordering</b>: Mengeliminasi circular wait deadlock pada PostgreSQL SELECT FOR UPDATE secara matematis dengan membandingkan UUID kedua akun secara leksikografis.<br/>"
+        "3. <b>Distributed Idempotency State Machine</b>: Menggunakan Redis atomic SETNX (ACQUIRED, IN_PROGRESS, COMPLETED). Ketika diuji dengan 5 request paralel di milidetik yang sama, 1 mutasi sukses dan 4 request duplikat diblokir instan via 409 Conflict.<br/>"
+        "4. <b>Automated 3-Way Reconciliation</b>: Membandingkan settlement CSV bank eksternal terhadap mutasi ledger internal untuk mendeteksi MATCHED, DISCREPANCY_AMOUNT, dan MISSING_IN_GATEWAY secara presisi.\"</i>"
     )
     pitch2_table = Table([[Paragraph(pitch_2m, callout_style)]], colWidths=[520])
     pitch2_table.setStyle(TableStyle([
@@ -352,43 +352,43 @@ def build_pdf(filename="Secure_Payment_Gateway_Interview_Playbook.pdf"):
 
     # SECTION 4: LIVE DEMO PLAYBOOK (5 MENIT DEMO DI DEPAN INTERVIEWER)
     story.append(Paragraph("4. LIVE DEMO PLAYBOOK: LANGKAH MEMUKAU SAAT LIVE CODING / INTERVIEW", h1_style))
-    story.append(Paragraph("Jika interviewer meminta melihat aplikasi berjalan, buka <code>http://localhost:8080/</code> dan ikuti urutan demonstrasi berikut:", body_style))
+    story.append(Paragraph("Jika interviewer meminta melihat aplikasi berjalan, buka <code>http://localhost:8080/</code> (atau via public tunnel <code>make tunnel</code>) dan gunakan keyboard shortcut angka untuk presentasi cepat:", body_style))
 
     steps_data = [
         [
             Paragraph("<b>Langkah</b>", body_bold),
-            Paragraph("<b>Tindakan di Layar</b>", body_bold),
+            Paragraph("<b>Tindakan / Shortcut</b>", body_bold),
             Paragraph("<b>Narasi yang Diucapkan</b>", body_bold)
         ],
         [
             Paragraph("<b>Step 1</b>", body_style),
-            Paragraph("Buka Dashboard, tunjukkan metrik atas & daftar rekening.", body_style),
-            Paragraph("<i>\"Di sini kita bisa melihat dashboard real-time yang memantau total rekening, total volume perputaran uang, dan verifikasi invariant &Sigma;Debit = &Sigma;Credit yang wajib selalu seimbang.\"</i>", body_style)
+            Paragraph("Buka Dashboard atau jalankan <code>make tunnel</code>.", body_style),
+            Paragraph("<i>\"Di sini kita bisa melihat Enterprise Operations Console yang memantau core switch secara real-time, lengkap dengan metrik p95 latency dan multi-tenant merchant switcher.\"</i>", body_style)
         ],
         [
             Paragraph("<b>Step 2</b>", body_style),
-            Paragraph("Lakukan transfer normal antara Budi Santoso dan Siti Rahma.", body_style),
-            Paragraph("<i>\"Saat saya klik Execute Transfer, transaksi diproses secara atomik. Perhatikan tabel Ledger di bawah: seketika muncul 2 baris entri DEBIT pada pengirim dan CREDIT pada penerima dengan saldo pasca-transaksi yang diperbarui.\"</i>", body_style)
+            Paragraph("Tekan keyboard <b>[1]</b> (Normal Transfer).", body_style),
+            Paragraph("<i>\"Saat saya picu transfer, transaksi melewati 5 tahap State Machine: dari verifikasi HMAC, Redis dedup, ACID row lock, mutasi Double-Entry, hingga audit chaining. Semua tahap menyala hijau dalam waktu < 15ms.\"</i>", body_style)
         ],
         [
             Paragraph("<b>Step 3</b>", body_style),
-            Paragraph("Uji Idempotensi: klik tombol transfer kedua kali tanpa ubah key.", body_style),
-            Paragraph("<i>\"Sekarang saya kirim ulang transfer dengan X-Idempotency-Key yang sama. Perhatikan latensi respons instan (~1-2ms) dan saldo tidak terpotong lagi, karena respons diambil dari Redis cache.\"</i>", body_style)
+            Paragraph("Tekan keyboard <b>[3]</b> (5x Concurrent Race Attack).", body_style),
+            Paragraph("<i>\"Sekarang saya simulasikan serangan race condition: 5 request HTTP ditembakkan serentak di milidetik yang sama via Promise.all(). Perhatikan hasilnya: Request #1 berhasil (200 OK), sementara Request #2 s/d #5 seketika diblokir oleh Redis SETNX dengan status 409 Conflict. Saldo tidak pernah terdebit dua kali.\"</i>", body_style)
         ],
         [
             Paragraph("<b>Step 4</b>", body_style),
-            Paragraph("Centang kotak 'Simulasi MITM (Tamper Signature)' lalu transfer.", body_style),
-            Paragraph("<i>\"Sekarang saya simulasikan serangan Man-In-The-Middle di mana payload diubah oleh pihak ketiga. Gateway langsung menolak dengan status HTTP 401 Unauthorized via constant-time HMAC check.\"</i>", body_style)
+            Paragraph("Buka tab Double-Entry & klik tombol <b>🔍 T-Account</b>.", body_style),
+            Paragraph("<i>\"Setiap mutasi tidak pernah mengubah saldo secara sembarangan, melainkan membentuk bagan T-Account berpasangan: DEBIT pada pengirim dan CREDIT pada penerima dengan selisih mutlak IDR 0.00.\"</i>", body_style)
         ],
         [
             Paragraph("<b>Step 5</b>", body_style),
-            Paragraph("Tunjukkan bagian Tamper-Evident Audit Chain.", body_style),
-            Paragraph("<i>\"Setiap aksi finansial membentuk rantai hash SHA-256 yang saling terhubung dengan Previous Hash, membuktikan rekaman transaksi tidak dapat disisipkan atau dimanipulasi dari dalam database.\"</i>", body_style)
+            Paragraph("Buka tab Audit Chain & klik <b>Simulate DB Tamper</b>.", body_style),
+            Paragraph("<i>\"Ini membuktikan Zero-Trust Audit Trail: ketika saya simulasikan manipulasi ilegal pada payload di database, sistem seketika mendeteksi ketidaksesuaian SHA-256 dan menyalakan alarm pelanggaran integritas data.\"</i>", body_style)
         ],
         [
             Paragraph("<b>Step 6</b>", body_style),
-            Paragraph("Klik '⚡ 1-Click Sample Reconciliation' di tabel rekonsiliasi.", body_style),
-            Paragraph("<i>\"Di bagian bawah, kita bisa menyimulasikan rekonsiliasi settlement bank (Mandiri/BCA). Sistem secara otomatis menjalankan 3-Way Match: transaksi yang cocok ditandai 100% MATCHED, selisih nominal ditandai DISCREPANCY, dan uang di bank yang belum ada di gateway ditandai MISSING_IN_GATEWAY.\"</i>", body_style)
+            Paragraph("Buka tab Bank Recon, klik <b>1-Click Recon</b> lalu <b>Export CSV</b>.", body_style),
+            Paragraph("<i>\"Di sini engine 3-way matching menyelaraskan laporan mutasi bank eksternal terhadap ledger internal, memisahkan transaksi 100% MATCHED, selisih biaya admin (DISCREPANCY), dan transaksi tertunda (MISSING_IN_GATEWAY) yang siap diekspor ke CSV.\"</i>", body_style)
         ]
     ]
 

@@ -60,3 +60,4 @@ if ($Provider -eq "cloudflare") {
     Write-Host "`n[STARTING] Launching ngrok on port $Port..." -ForegroundColor Cyan
     ngrok http $Port
 }
+

@@ -22,8 +22,10 @@ Thumbs.db
 .vscode/
 *.swp
 
-# PDF guides & interview documentation
+# PDF & PPT presentation guides (Local Interview Cheatsheets)
 *.pdf
 docs/*.pdf
+*.pptx
+*.ppt
 
 
