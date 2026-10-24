@@ -3,7 +3,8 @@
 > **Production-Grade, High-Performance Payment Processing & Double-Entry Ledger Engine**  
 > Built with Go, PostgreSQL, and Redis. Engineered with a zero-trust cybersecurity posture, high-throughput concurrency control, and an interactive web dashboard.
 
-[![Go Version](https://img.shields.io/badge/Go-1.27%2B-blue.svg)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.22%2B-blue.svg)](https://golang.org)
+[![CI Pipeline](https://github.com/fransalwan/secure-payment-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/fransalwan/secure-payment-gateway/actions/workflows/ci.yml)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%2016-blue.svg)](https://www.postgresql.org/)
 [![Cache & Lock](https://img.shields.io/badge/Cache%20%26%20Lock-Redis%207-red.svg)](https://redis.io/)
 [![Security](https://img.shields.io/badge/Security-AES--256--GCM%20%7C%20HMAC--SHA256-green.svg)](#cybersecurity-architecture)
@@ -152,11 +153,9 @@ Uang tidak pernah diubah secara sembarangan. Setiap transaksi selalu menghasilka
 | `POST` | `/api/v1/transfers` | Eksekusi transfer saldo atomik berpasangan | `X-Signature`, `X-Timestamp`, `X-Idempotency-Key` |
 | `GET` | `/api/v1/ledger` | Riwayat mutasi Double-Entry Ledger | Publik |
 | `GET` | `/api/v1/audit-logs` | Rantai Audit Tamper-Evident SHA-256 | Publik |
-| `POST` | `/api/v1/security/sign` | Helper pembuat signature untuk testing UI | Publik |
-| `POST` | `/api/v1/reconciliation/upload` | Upload & proses rekonsiliasi CSV settlement bank | Publik |
+| `POST` | `/api/v1/reconciliation/upload` | Ingestion & Automated 3-Way Bank Reconciliation CSV | Publik (Multipart / CSV Stream) |
 | `GET` | `/api/v1/reconciliation/batches` | Daftar batch riwayat rekonsiliasi | Publik |
 | `GET` | `/api/v1/reconciliation/batches/{id}` | Laporan detail selisih & kecocokan batch | Publik |
-| `POST` | `/api/v1/reconciliation/sample` | Simulasi 1-klik rekonsiliasi bank untuk demo UI | Publik |
 
 ---
 

@@ -323,6 +323,10 @@ def build_pdf(filename="Secure_Payment_Gateway_Interview_Playbook.pdf"):
         (
             "Q10. Berapa performa yang Anda capai saat stress testing dan bagaimana membuktikannya?",
             "Menggunakan tool k6, saya mensimulasikan ratusan Virtual Users mengirim transaksi transfer simultan. Hasilnya menghasilkan latensi p95 di bawah 45ms dan p99 di bawah 90ms. Yang paling krusial, pada skenario ekstrim di mana ratusan user bersaing menguras saldo 1 rekening yang sama, konsistensi saldo terbukti 100% akurat dengan 0 overdraft violation."
+        ),
+        (
+            "Q11. Mengapa gateway tidak menyediakan endpoint untuk men-generate signature?",
+            "Menyediakan endpoint signing di server payment gateway adalah kerentanan keamanan (*security backdoor*) yang fatal. Di dunia nyata, tanda tangan HMAC-SHA256 wajib di-generate secara independen di sisi merchant menggunakan Merchant Secret Key mereka (via SDK atau Web Crypto). Gateway berfungsi murni sebagai verifikator zero-trust tanpa pernah mengekspos endpoint penandatanganan payload publik."
         )
     ]
 

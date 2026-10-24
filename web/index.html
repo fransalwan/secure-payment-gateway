@@ -749,6 +749,22 @@
       }
     }
 
+    // Native Web Crypto API HMAC-SHA256 (Client-Side Merchant Signing)
+    async function computeHMACSHA256(secret, message) {
+      const enc = new TextEncoder();
+      const key = await window.crypto.subtle.importKey(
+        "raw",
+        enc.encode(secret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+      );
+      const signature = await window.crypto.subtle.sign("HMAC", key, enc.encode(message));
+      return Array.from(new Uint8Array(signature))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+    }
+
     // Execute Transfer Handler
     async function executeTransfer(e) {
       if (e) e.preventDefault();
@@ -782,17 +798,10 @@
         timestamp -= 600; // 10 minutes ago -> triggers replay attack rejection!
       }
 
-      // Request helper signature from backend endpoint
-      const signRes = await fetch('/api/v1/security/sign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          timestamp: timestamp,
-          payload: payloadString
-        })
-      });
-      const signData = await signRes.json();
-      let signature = signData.data ? signData.data.signature : 'invalid-sig';
+      // Compute HMAC-SHA256 signature natively on client-side (no backend backdoor)
+      const merchantSecret = "spg-secret-hmac-key-for-signatures";
+      const messageToSign = `${timestamp}.${payloadString}`;
+      let signature = await computeHMACSHA256(merchantSecret, messageToSign);
 
       if (document.getElementById('attack-tamper').checked) {
         signature = 'deadbeef' + signature.substring(8); // Tamper signature -> triggers MITM rejection!
@@ -849,12 +858,23 @@
     async function runSampleReconciliation() {
       const btn = document.getElementById('btn-sample-recon');
       btn.innerText = 'Processing 3-Way Match...';
+      const sampleCSV = `reference_id,amount,bank_status,timestamp
+REF-2026-001,50000,SUCCESS,2026-10-25T01:00:00Z
+REF-2026-UNKNOWN-999,75000,SUCCESS,2026-10-25T01:05:00Z
+REF-SAMPLE-MISMATCH,120000,SUCCESS,2026-10-25T01:10:00Z`;
+
       try {
-        const res = await fetch('/api/v1/reconciliation/sample', { method: 'POST' });
+        const res = await fetch('/api/v1/reconciliation/upload?bank=MANDIRI', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/csv' },
+          body: sampleCSV
+        });
         const json = await res.json();
         if (json.success && json.data) {
-          renderReconciliationResult(json.data);
-          showToast('Rekonsiliasi Selesai', `Penyelarasan batch Mandiri selesai: ${json.data.batch.total_records} record diproses.`, 'success');
+          const detailRes = await fetch(`/api/v1/reconciliation/batches/${json.data.id}`);
+          const detailJson = await detailRes.json();
+          renderReconciliationResult(detailJson.data);
+          showToast('Rekonsiliasi Selesai', `Penyelarasan batch Mandiri selesai: ${json.data.total_records} record diproses.`, 'success');
         } else {
           showToast('Rekonsiliasi Gagal', json.message || 'Error', 'error');
         }

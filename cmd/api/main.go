@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,7 +17,6 @@ import (
 	postgresrepo "github.com/fransalwan/secure-payment-gateway/internal/repository/postgres"
 	redisrepo "github.com/fransalwan/secure-payment-gateway/internal/repository/redis"
 	"github.com/fransalwan/secure-payment-gateway/internal/service"
-	"github.com/fransalwan/secure-payment-gateway/pkg/crypto"
 	"github.com/fransalwan/secure-payment-gateway/pkg/response"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -105,25 +103,6 @@ func main() {
 			recon.Post("/upload", reconHandler.UploadAndReconcile)
 			recon.Get("/batches", reconHandler.ListBatches)
 			recon.Get("/batches/{id}", reconHandler.GetBatchDetail)
-			recon.Post("/sample", reconHandler.SampleReconciliation)
-		})
-
-		// Security Signature Helper Endpoint for UI Simulator Playground
-		r.Post("/security/sign", func(w http.ResponseWriter, r *http.Request) {
-			var body struct {
-				Timestamp int64  `json:"timestamp"`
-				Payload   string `json:"payload"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				response.BadRequest(w, "invalid request body", "INVALID_JSON", err.Error())
-				return
-			}
-			msg := fmt.Sprintf("%d.%s", body.Timestamp, body.Payload)
-			sig := crypto.GenerateHMACSignature([]byte(msg), cfg.HMACSecretKey)
-			response.OK(w, "signature generated", map[string]interface{}{
-				"timestamp": body.Timestamp,
-				"signature": sig,
-			})
 		})
 
 		// Transfers Endpoint Protected by HMAC-SHA256 & Anti-Replay

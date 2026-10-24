@@ -1,7 +1,6 @@
 package http
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"strings"
@@ -94,27 +93,4 @@ func (h *ReconciliationHandler) GetBatchDetail(w http.ResponseWriter, r *http.Re
 	response.OK(w, "reconciliation batch detail retrieved", detail)
 }
 
-// SampleReconciliation simulates a realistic bank settlement report for live testing
-func (h *ReconciliationHandler) SampleReconciliation(w http.ResponseWriter, r *http.Request) {
-	bankName := "MANDIRI"
-	sampleCSV := `reference_id,amount,bank_status,timestamp
-REF-2026-001,50000,SUCCESS,2026-10-25T01:00:00Z
-REF-2026-UNKNOWN-999,75000,SUCCESS,2026-10-25T01:05:00Z
-REF-SAMPLE-MISMATCH,120000,SUCCESS,2026-10-25T01:10:00Z`
-
-	records, err := pkgrecon.ParseBankSettlementCSV(bytes.NewBufferString(sampleCSV))
-	if err != nil {
-		response.InternalServerError(w, "failed to parse sample csv")
-		return
-	}
-
-	batch, err := h.svc.ReconcileBankSettlement(r.Context(), bankName, records)
-	if err != nil {
-		response.InternalServerError(w, fmt.Sprintf("sample reconciliation failed: %v", err))
-		return
-	}
-
-	detail, _ := h.svc.GetBatchDetail(r.Context(), batch.ID)
-	response.OK(w, "sample reconciliation simulated successfully", detail)
-}
 
