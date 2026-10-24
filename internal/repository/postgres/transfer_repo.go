@@ -278,4 +278,47 @@ func (r *TransferRepository) ListAuditLogs(ctx context.Context, limit int) ([]*d
 	return logs, nil
 }
 
+func (r *TransferRepository) GetTransactionsByReferenceIDs(ctx context.Context, refIDs []string) (map[string]*domain.Transaction, error) {
+	result := make(map[string]*domain.Transaction)
+	if len(refIDs) == 0 {
+		return result, nil
+	}
+
+	query := `
+		SELECT id, reference_id, idempotency_key, source_account_id, destination_account_id,
+		       amount, currency, status, description, created_at, updated_at
+		FROM transactions
+		WHERE reference_id = ANY($1)
+	`
+	rows, err := r.pool.Query(ctx, query, refIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query transactions by reference IDs: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var tx domain.Transaction
+		err := rows.Scan(
+			&tx.ID,
+			&tx.ReferenceID,
+			&tx.IdempotencyKey,
+			&tx.SourceAccountID,
+			&tx.DestinationAccountID,
+			&tx.Amount,
+			&tx.Currency,
+			&tx.Status,
+			&tx.Description,
+			&tx.CreatedAt,
+			&tx.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan transaction: %w", err)
+		}
+		result[tx.ReferenceID] = &tx
+	}
+
+	return result, nil
+}
+
+
 

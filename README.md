@@ -153,6 +153,10 @@ Uang tidak pernah diubah secara sembarangan. Setiap transaksi selalu menghasilka
 | `GET` | `/api/v1/ledger` | Riwayat mutasi Double-Entry Ledger | Publik |
 | `GET` | `/api/v1/audit-logs` | Rantai Audit Tamper-Evident SHA-256 | Publik |
 | `POST` | `/api/v1/security/sign` | Helper pembuat signature untuk testing UI | Publik |
+| `POST` | `/api/v1/reconciliation/upload` | Upload & proses rekonsiliasi CSV settlement bank | Publik |
+| `GET` | `/api/v1/reconciliation/batches` | Daftar batch riwayat rekonsiliasi | Publik |
+| `GET` | `/api/v1/reconciliation/batches/{id}` | Laporan detail selisih & kecocokan batch | Publik |
+| `POST` | `/api/v1/reconciliation/sample` | Simulasi 1-klik rekonsiliasi bank untuk demo UI | Publik |
 
 ---
 
@@ -202,6 +206,27 @@ outbox_events (
     event_type VARCHAR(50),
     payload JSONB,
     status VARCHAR(20) -- PENDING, PROCESSED, FAILED
+)
+
+reconciliation_batches (
+    id UUID PRIMARY KEY,
+    batch_number VARCHAR(64) UNIQUE,
+    bank_name VARCHAR(64),
+    total_records INT,
+    matched_count INT,
+    discrepancy_count INT,
+    missing_in_gateway_count INT,
+    status VARCHAR(20) -- PROCESSING, COMPLETED, FAILED
+)
+
+reconciliation_items (
+    id UUID PRIMARY KEY,
+    batch_id UUID REFERENCES reconciliation_batches(id),
+    reference_id VARCHAR(64),
+    bank_amount BIGINT,
+    gateway_amount BIGINT,
+    difference_amount BIGINT,
+    match_status VARCHAR(30) -- MATCHED, DISCREPANCY_AMOUNT, MISSING_IN_GATEWAY
 )
 ```
 

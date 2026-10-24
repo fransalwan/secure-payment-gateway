@@ -256,6 +256,11 @@ def build_pdf(filename="Secure_Payment_Gateway_Interview_Playbook.pdf"):
             Paragraph("<b>Reliable Webhooks</b>", body_style),
             Paragraph("Transactional Outbox Pattern (SKIP LOCKED)", body_style),
             Paragraph("Memanggil broker (Kafka/RabbitMQ) langsung di handler rentan dual-write (DB commit sukses tapi broker down). Outbox pattern menyimpan event di tabel DB yang sama dalam 1 transaksi ACID, lalu worker memprosesnya aman.", body_style)
+        ],
+        [
+            Paragraph("<b>Penyelarasan Bank (Rekonsiliasi)</b>", body_style),
+            Paragraph("Automated 3-Way Matching Engine", body_style),
+            Paragraph("Membandingkan laporan settlement eksternal perbankan (CSV) terhadap mutasi ledger internal secara otomatis untuk mendeteksi selisih nominal (discrepancy), transaksi hilang di gateway, atau transaksi hilang di bank.", body_style)
         ]
     ]
 
@@ -375,6 +380,11 @@ def build_pdf(filename="Secure_Payment_Gateway_Interview_Playbook.pdf"):
             Paragraph("<b>Step 5</b>", body_style),
             Paragraph("Tunjukkan bagian Tamper-Evident Audit Chain.", body_style),
             Paragraph("<i>\"Setiap aksi finansial membentuk rantai hash SHA-256 yang saling terhubung dengan Previous Hash, membuktikan rekaman transaksi tidak dapat disisipkan atau dimanipulasi dari dalam database.\"</i>", body_style)
+        ],
+        [
+            Paragraph("<b>Step 6</b>", body_style),
+            Paragraph("Klik '⚡ 1-Click Sample Reconciliation' di tabel rekonsiliasi.", body_style),
+            Paragraph("<i>\"Di bagian bawah, kita bisa menyimulasikan rekonsiliasi settlement bank (Mandiri/BCA). Sistem secara otomatis menjalankan 3-Way Match: transaksi yang cocok ditandai 100% MATCHED, selisih nominal ditandai DISCREPANCY, dan uang di bank yang belum ada di gateway ditandai MISSING_IN_GATEWAY.\"</i>", body_style)
         ]
     ]
 
@@ -427,3 +437,4 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         output_filename = sys.argv[1]
     build_pdf(output_filename)
+

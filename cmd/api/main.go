@@ -55,13 +55,16 @@ func main() {
 
 	accountRepo := postgresrepo.NewAccountRepository(pgPool)
 	transferRepo := postgresrepo.NewTransferRepository(pgPool)
+	reconRepo := postgresrepo.NewReconciliationRepository(pgPool)
 	idempotencyRepo := redisrepo.NewIdempotencyRepository(redisClient)
 
 	accountService := service.NewAccountService(accountRepo, cfg)
 	transferService := service.NewTransferService(transferRepo, idempotencyRepo, cfg)
+	reconService := service.NewReconciliationService(reconRepo, transferRepo)
 
 	accountHandler := httphandler.NewAccountHandler(accountService)
 	transferHandler := httphandler.NewTransferHandler(transferService)
+	reconHandler := httphandler.NewReconciliationHandler(reconService)
 
 	r := chi.NewRouter()
 
@@ -96,6 +99,14 @@ func main() {
 		// Ledger & Audit Chain Endpoints
 		r.Get("/ledger", transferHandler.ListLedger)
 		r.Get("/audit-logs", transferHandler.ListAuditLogs)
+
+		// Bank Reconciliation Endpoints
+		r.Route("/reconciliation", func(recon chi.Router) {
+			recon.Post("/upload", reconHandler.UploadAndReconcile)
+			recon.Get("/batches", reconHandler.ListBatches)
+			recon.Get("/batches/{id}", reconHandler.GetBatchDetail)
+			recon.Post("/sample", reconHandler.SampleReconciliation)
+		})
 
 		// Security Signature Helper Endpoint for UI Simulator Playground
 		r.Post("/security/sign", func(w http.ResponseWriter, r *http.Request) {

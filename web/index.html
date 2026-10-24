@@ -292,6 +292,72 @@
       </div>
     </section>
 
+    <!-- Automated Bank Reconciliation Engine -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Automated Bank Reconciliation Engine (Penyelarasan Bank Otomatis)
+          </h2>
+          <p class="text-xs text-slate-400">Penyelarasan otomatis 3-Way Matching antara laporan settlement bank eksternal vs ledger internal</p>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <button onclick="runSampleReconciliation()" id="btn-sample-recon" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold text-xs transition shadow-md shadow-teal-500/20 flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            ⚡ 1-Click Sample Reconciliation
+          </button>
+          <label class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs transition border border-slate-700 cursor-pointer flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Upload CSV
+            <input type="file" id="recon-file-input" accept=".csv" onchange="uploadReconciliationCSV(event)" class="hidden">
+          </label>
+        </div>
+      </div>
+
+      <!-- Batch Stats Summary (Dynamic) -->
+      <div id="recon-summary-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-3 hidden">
+        <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+          <span class="text-[10px] uppercase font-bold text-slate-500">Total Bank Records</span>
+          <div class="text-xl font-bold text-white mt-0.5" id="recon-stat-total">0</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+          <span class="text-[10px] uppercase font-bold text-emerald-400">100% Matched</span>
+          <div class="text-xl font-bold text-emerald-400 mt-0.5" id="recon-stat-matched">0</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+          <span class="text-[10px] uppercase font-bold text-amber-400">Discrepancy</span>
+          <div class="text-xl font-bold text-amber-400 mt-0.5" id="recon-stat-discrepancy">0</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+          <span class="text-[10px] uppercase font-bold text-rose-400">Missing in Gateway</span>
+          <div class="text-xl font-bold text-rose-400 mt-0.5" id="recon-stat-missing">0</div>
+        </div>
+      </div>
+
+      <!-- Reconciliation Items Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+            <tr>
+              <th class="py-3 px-4">Reference ID</th>
+              <th class="py-3 px-4">Bank Amount</th>
+              <th class="py-3 px-4">Gateway Amount</th>
+              <th class="py-3 px-4">Variance (Selisih)</th>
+              <th class="py-3 px-4">Match Status</th>
+              <th class="py-3 px-4">Audit Remarks</th>
+            </tr>
+          </thead>
+          <tbody id="recon-table-body" class="divide-y divide-slate-800/60 font-mono">
+            <tr>
+              <td colspan="6" class="text-center py-6 text-slate-500 font-sans">Klik <b>⚡ 1-Click Sample Reconciliation</b> atau upload file CSV settlement untuk melihat hasil pencocokan otomatis.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+
   </main>
 
   <footer class="border-t border-slate-900 py-6 text-center text-xs text-slate-500">
@@ -570,6 +636,96 @@
         respBadge.className = 'font-mono text-[11px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold';
         respPreview.innerText = err.toString();
       }
+    }
+
+    // Reconciliation Handlers
+    async function runSampleReconciliation() {
+      const btn = document.getElementById('btn-sample-recon');
+      btn.innerText = 'Processing...';
+      try {
+        const res = await fetch('/api/v1/reconciliation/sample', { method: 'POST' });
+        const json = await res.json();
+        if (json.success && json.data) {
+          renderReconciliationResult(json.data);
+        } else {
+          alert('Failed: ' + (json.message || 'error'));
+        }
+      } catch (err) {
+        alert('Network error: ' + err.message);
+      } finally {
+        btn.innerText = '⚡ 1-Click Sample Reconciliation';
+      }
+    }
+
+    async function uploadReconciliationCSV(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/v1/reconciliation/upload?bank=CUSTOM', {
+          method: 'POST',
+          body: formData
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          // Fetch full batch details
+          const detailRes = await fetch(`/api/v1/reconciliation/batches/${json.data.id}`);
+          const detailJson = await detailRes.json();
+          renderReconciliationResult(detailJson.data);
+        } else {
+          alert('Reconciliation failed: ' + (json.message || 'error'));
+        }
+      } catch (err) {
+        alert('Upload error: ' + err.message);
+      }
+    }
+
+    function renderReconciliationResult(data) {
+      const batch = data.batch;
+      const items = data.items || [];
+
+      // Show summary cards
+      const summaryCards = document.getElementById('recon-summary-cards');
+      summaryCards.classList.remove('hidden');
+
+      document.getElementById('recon-stat-total').innerText = batch.total_records;
+      document.getElementById('recon-stat-matched').innerText = batch.matched_count;
+      document.getElementById('recon-stat-discrepancy').innerText = batch.discrepancy_count;
+      document.getElementById('recon-stat-missing').innerText = batch.missing_in_gateway_count;
+
+      // Render table rows
+      const tbody = document.getElementById('recon-table-body');
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-slate-500 font-sans">Tidak ada transaksi ditemukan.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = items.map(item => {
+        let badgeClass = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        if (item.match_status === 'DISCREPANCY_AMOUNT') {
+          badgeClass = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+        } else if (item.match_status === 'MISSING_IN_GATEWAY') {
+          badgeClass = 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+        }
+
+        const diffDisplay = item.difference_amount !== 0 ? formatRupiah(item.difference_amount) : '0';
+
+        return `
+          <tr class="hover:bg-slate-800/30 transition">
+            <td class="py-2.5 px-4 font-bold text-slate-200">${item.reference_id}</td>
+            <td class="py-2.5 px-4 text-slate-300">${formatRupiah(item.bank_amount)}</td>
+            <td class="py-2.5 px-4 text-slate-300">${item.gateway_amount > 0 ? formatRupiah(item.gateway_amount) : '<span class="text-slate-600">-</span>'}</td>
+            <td class="py-2.5 px-4 font-bold ${item.difference_amount !== 0 ? 'text-amber-400' : 'text-slate-500'}">${diffDisplay}</td>
+            <td class="py-2.5 px-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${badgeClass}">${item.match_status}</span>
+            </td>
+            <td class="py-2.5 px-4 text-slate-400 text-[11px] font-sans">${item.remarks}</td>
+          </tr>
+        `;
+      }).join('');
     }
 
     // Auto-init on load
