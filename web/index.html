@@ -132,10 +132,6 @@
           Audit Chain (SHA-256)
         </button>
 
-        <button onclick="switchTab('tab-cheatsheet')" id="nav-tab-cheatsheet" class="tab-btn px-3 py-2.5 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition flex items-center gap-2 whitespace-nowrap">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-          Architecture &amp; Interview Guide
-        </button>
       </nav>
     </div>
   </header>
@@ -280,9 +276,9 @@
             </div>
           </div>
 
-          <!-- Quick Tip for Interviewers -->
+          <!-- Engine Concurrency Invariant -->
           <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[11px] text-slate-400">
-            <span class="font-bold text-emerald-400 block mb-0.5">💡 Tech Lead Insight:</span>
+            <span class="font-bold text-emerald-400 block mb-0.5">🛡️ Concurrency Invariant:</span>
             Pessimistic row locking (<code>SELECT FOR UPDATE</code>) dengan pengurutan UUID deterministik memastikan operasi debit dan kredit ini 100% bebas circular wait deadlock.
           </div>
         </div>
@@ -461,61 +457,12 @@
       </div>
     </div>
 
-    <!-- TAB 5: ARCHITECTURE & INTERVIEW TALKING POINTS -->
-    <div id="tab-cheatsheet" class="tab-content hidden space-y-6">
-      <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-6">
-        <div class="border-b border-slate-800 pb-3">
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-            Technical Interview Cheatsheet &amp; Architecture Matrix
-          </h2>
-          <p class="text-xs text-slate-400">Gunakan panduan ini saat sesi screen-sharing wawancara teknis backend fintech</p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-            <h4 class="font-bold text-emerald-400 text-sm">1. Double-Entry Bookkeeping</h4>
-            <p class="text-slate-300 leading-relaxed">
-              Uang tidak pernah di-update sembarangan (<code>UPDATE balance = balance - X</code>). Setiap perpindahan wajib memiliki pasangan <b>DEBIT</b> dan <b>CREDIT</b> yang mutlak seimbang (&Sigma;Debit = &Sigma;Credit). Ini menjamin keterlacakan audit (*auditability*) dan invariant saldo non-negatif.
-            </p>
-          </div>
-
-          <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-            <h4 class="font-bold text-teal-400 text-sm">2. Deterministic Lock Ordering (Anti-Deadlock)</h4>
-            <p class="text-slate-300 leading-relaxed">
-              Jika Transaksi 1 lock Akun A &rarr; B, sementara Transaksi 2 lock Akun B &rarr; A, database akan mengalami deadlock. Dengan membandingkan UUID kedua akun secara leksikografis (selalu lock ID lebih kecil dulu), circular wait deadlock dieliminasi secara matematis.
-            </p>
-          </div>
-
-          <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-            <h4 class="font-bold text-amber-400 text-sm">3. Distributed Idempotency State Machine</h4>
-            <p class="text-slate-300 leading-relaxed">
-              Menggunakan Redis atomic <code>SETNX</code> dengan 3 status: <code>ACQUIRED</code>, <code>IN_PROGRESS</code> (menolak duplikasi konkuren via 409 Conflict), dan <code>COMPLETED</code> (mengembalikan respons ter-cache seketika tanpa mutasi saldo berulang jika network retry).
-            </p>
-          </div>
-
-          <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-            <h4 class="font-bold text-indigo-400 text-sm">4. Zero-Trust Security (AES-256-GCM &amp; HMAC)</h4>
-            <p class="text-slate-300 leading-relaxed">
-              Data identitas dienkripsi di level aplikasi menggunakan AES-256-GCM (Authenticated Encryption). Verifikasi tanda tangan API menggunakan <code>hmac.Equal</code> konstan-waktu untuk menangkal timing attacks, plus toleransi timestamp &plusmn;5 menit untuk mitigasi Replay Attack.
-            </p>
-          </div>
-        </div>
-
-        <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-2 text-xs">
-          <h4 class="font-bold text-white text-sm">5. Automated 3-Way Reconciliation</h4>
-          <p class="text-slate-300 leading-relaxed">
-            Menjawab pertanyaan krusial bank integration: *"Bagaimana jika bank mencatat transaksi berhasil tapi gateway timeout?"* Engine rekonsiliasi membandingkan laporan bank eksternal terhadap mutasi ledger internal untuk mendeteksi <code>MATCHED</code> (100% cocok), <code>DISCREPANCY_AMOUNT</code> (selisih nominal), atau <code>MISSING_IN_GATEWAY</code>.
-          </p>
-        </div>
-      </div>
-    </div>
 
   </main>
 
   <!-- Footer -->
   <footer class="border-t border-slate-900 py-4 text-center text-xs text-slate-500 bg-slate-950">
-    <p>Secure Payment Gateway &bull; Designed for Fintech Backend Engineering Portfolio &bull; Open Source</p>
+    <p>Secure Payment Gateway &bull; Financial Core Switch &amp; Double-Entry Settlement Platform &bull; v1.2.0-enterprise</p>
   </footer>
 
   <!-- Frontend Logic & Controller -->
