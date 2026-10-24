@@ -22,3 +22,8 @@ Thumbs.db
 .vscode/
 *.swp
 
+# PDF guides & interview documentation
+*.pdf
+docs/*.pdf
+
+
