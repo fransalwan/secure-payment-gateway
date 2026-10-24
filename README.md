@@ -272,7 +272,7 @@ make tunnel
 # Atau paksa menggunakan ngrok:
 make tunnel-ngrok
 ```
-Perintah ini langsung menghasilkan URL publik bertaraf HTTPS (contoh: `https://xxxx.trycloudflare.com`) yang dapat dibuka oleh interviewer di perangkat mana pun tanpa perlu instalasi tambahan.
+Perintah ini langsung menghasilkan URL publik bertaraf HTTPS (contoh: `https://xxxx.trycloudflare.com`) yang dapat diakses secara publik dari browser atau API client (Postman/curl) di perangkat mana pun tanpa perlu instalasi tambahan.
 
 
 ---
@@ -290,14 +290,6 @@ k6 run scripts/k6_load_test.js
 * **Latency p99**: $< 90$ ms
 * **Zero Negative Balance Invariant**: Terbukti $0$ saldo negatif bahkan saat ribuan request konkuren bersaing pada satu akun.
 
----
-
-## 💼 Poin Diskusi Saat Technical Interview
-
-Ketika ditanya mengenai proyek ini saat wawancara teknis:
-1. **Tentang Race Condition**: Jelaskan bagaimana pengurutan UUID deterministik memecahkan persoalan circular wait deadlock pada PostgreSQL `SELECT FOR UPDATE`.
-2. **Tentang Data Loss**: Jelaskan peran Transactional Outbox Pattern yang mencatat event dalam satu transaksi ACID yang sama dengan mutasi saldo, mencegah masalah *Dual-Write*.
-3. **Tentang Keamanan Finansial**: Jelaskan mengapa enkripsi AES-256-GCM dipilih dibanding CBC (karena integritas terotentikasi), dan pentingnya `hmac.Equal` untuk menolak side-channel timing attack.
 
 ---
 
