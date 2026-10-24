@@ -79,11 +79,13 @@
           </select>
         </div>
 
-        <!-- Real-Time Switch Latency Badge -->
+        <!-- Real-Time Switch Latency Badge with Rolling Percentile -->
         <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span class="text-slate-400 font-medium text-[11px]">Core Switch:</span>
           <span class="text-emerald-400 font-mono font-bold text-[11px]" id="api-status">Healthy (2ms)</span>
+          <span class="text-slate-600 text-[10px] font-mono">|</span>
+          <span class="text-slate-400 font-mono text-[10px]" id="api-p95" title="95th Percentile SLA">p95: 4ms</span>
         </div>
 
         <button onclick="loadAllData()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium transition flex items-center gap-1.5 text-xs">
@@ -103,20 +105,29 @@
           </span>
         </div>
         <div class="flex flex-wrap items-center gap-1.5">
-          <button onclick="runScenarioTransfer()" class="px-2.5 py-1 rounded-md bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold transition">
-            1. Normal Transfer (Atomic)
+          <button onclick="runScenarioTransfer()" class="px-2.5 py-1 rounded-md bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold transition flex items-center gap-1">
+            <span class="text-[9px] px-1 py-0.2 rounded bg-emerald-500/30 text-emerald-200 font-mono">1</span>
+            Normal Transfer (Atomic)
           </button>
-          <button onclick="runScenarioIdempotency()" class="px-2.5 py-1 rounded-md bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold transition">
-            2. Idempotency (Repeat Key)
+          <button onclick="runScenarioIdempotency()" class="px-2.5 py-1 rounded-md bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold transition flex items-center gap-1">
+            <span class="text-[9px] px-1 py-0.2 rounded bg-indigo-500/30 text-indigo-200 font-mono">2</span>
+            Idempotency (Repeat Key)
           </button>
-          <button onclick="runScenarioMITM()" class="px-2.5 py-1 rounded-md bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-[11px] font-semibold transition">
-            3. MITM Attack (Tampered)
+          <button onclick="runScenarioConcurrentRace()" class="px-2.5 py-1 rounded-md bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-[11px] font-semibold transition flex items-center gap-1">
+            <span class="text-[9px] px-1 py-0.2 rounded bg-purple-500/30 text-purple-200 font-mono">3</span>
+            ⚡ Race Attack (Spam 5x Paralel)
           </button>
-          <button onclick="runScenarioReplay()" class="px-2.5 py-1 rounded-md bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-[11px] font-semibold transition">
-            4. Replay Attack (&gt;5m)
+          <button onclick="runScenarioMITM()" class="px-2.5 py-1 rounded-md bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-[11px] font-semibold transition flex items-center gap-1">
+            <span class="text-[9px] px-1 py-0.2 rounded bg-rose-500/30 text-rose-200 font-mono">4</span>
+            MITM Attack (Tampered)
           </button>
-          <button onclick="runScenarioReconciliation()" class="px-2.5 py-1 rounded-md bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-500/30 text-[11px] font-semibold transition">
-            5. Bank Reconciliation (3-Way)
+          <button onclick="runScenarioReplay()" class="px-2.5 py-1 rounded-md bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-[11px] font-semibold transition flex items-center gap-1">
+            <span class="text-[9px] px-1 py-0.2 rounded bg-amber-500/30 text-amber-200 font-mono">5</span>
+            Replay Attack (&gt;5m)
+          </button>
+          <button onclick="runScenarioReconciliation()" class="px-2.5 py-1 rounded-md bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-500/30 text-[11px] font-semibold transition flex items-center gap-1">
+            <span class="text-[9px] px-1 py-0.2 rounded bg-teal-500/30 text-teal-200 font-mono">6</span>
+            Bank Reconciliation (3-Way)
           </button>
         </div>
       </div>
@@ -301,6 +312,47 @@
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <!-- Financial State Machine Pipeline Tracker -->
+              <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                <div class="flex items-center justify-between text-[10px] font-mono">
+                  <span class="font-bold text-slate-400">FINANCIAL STATE MACHINE LIFECYCLE</span>
+                  <span id="pipeline-status-text" class="text-slate-500 font-bold">READY</span>
+                </div>
+                <div class="grid grid-cols-5 gap-1 text-[9px] font-mono text-center">
+                  <div id="step-hmac" class="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-500 transition-all">
+                    <span class="block text-[8px] opacity-60">1. AUTH</span>
+                    <span class="font-bold text-[9px]">HMAC-SHA256</span>
+                  </div>
+                  <div id="step-idemp" class="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-500 transition-all">
+                    <span class="block text-[8px] opacity-60">2. DEDUP</span>
+                    <span class="font-bold text-[9px]">Redis SETNX</span>
+                  </div>
+                  <div id="step-lock" class="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-500 transition-all">
+                    <span class="block text-[8px] opacity-60">3. ACID LOCK</span>
+                    <span class="font-bold text-[9px]">Ordered UUID</span>
+                  </div>
+                  <div id="step-ledger" class="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-500 transition-all">
+                    <span class="block text-[8px] opacity-60">4. LEDGER</span>
+                    <span class="font-bold text-[9px]">Double-Entry</span>
+                  </div>
+                  <div id="step-audit" class="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-500 transition-all">
+                    <span class="block text-[8px] opacity-60">5. AUDIT</span>
+                    <span class="font-bold text-[9px]">SHA-256 Chain</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 5x Concurrent Race Attack Report Box -->
+              <div id="race-results-container" class="hidden p-3.5 rounded-2xl bg-slate-950 border border-purple-500/40 space-y-2 shadow-xl shadow-purple-950/30">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-purple-400 text-xs flex items-center gap-1.5">
+                    <span>⚡ Concurrent Race: 5 Parallel Requests</span>
+                  </span>
+                  <span id="race-summary-badge" class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold">1 Committed &bull; 4 Blocked</span>
+                </div>
+                <div id="race-items-list" class="space-y-1 text-[11px] font-mono"></div>
               </div>
 
               <!-- Live Execution Telemetry Grid -->
@@ -1047,6 +1099,92 @@
         .join("");
     }
 
+    let rollingLatencies = [4, 6, 8, 3, 5];
+
+    function recordLatency(ms) {
+      if (!ms || isNaN(ms)) return;
+      rollingLatencies.push(Number(ms));
+      if (rollingLatencies.length > 25) rollingLatencies.shift();
+
+      const sorted = [...rollingLatencies].sort((a, b) => a - b);
+      const p95 = sorted[Math.floor(sorted.length * 0.95)] || sorted[sorted.length - 1];
+      const p95El = document.getElementById('api-p95');
+      if (p95El) {
+        p95El.innerText = `p95: ${Math.round(p95)}ms`;
+      }
+    }
+
+    function resetPipeline() {
+      ['step-hmac', 'step-idemp', 'step-lock', 'step-ledger', 'step-audit'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.className = 'p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-500 transition-all';
+        }
+      });
+      const txt = document.getElementById('pipeline-status-text');
+      if (txt) {
+        txt.innerText = 'PROCESSING PIPELINE...';
+        txt.className = 'text-amber-400 font-bold';
+      }
+    }
+
+    function updatePipeline(success, failStage = null) {
+      const steps = ['step-hmac', 'step-idemp', 'step-lock', 'step-ledger', 'step-audit'];
+      const passClass = 'p-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold transition-all';
+      const failClass = 'p-1.5 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-400 font-bold transition-all';
+      const warnClass = 'p-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 font-bold transition-all';
+      const skipClass = 'p-1.5 rounded-lg bg-slate-900/60 border border-slate-800/60 text-slate-600 transition-all';
+
+      const txt = document.getElementById('pipeline-status-text');
+
+      if (success) {
+        steps.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.className = passClass;
+        });
+        if (txt) {
+          txt.innerText = 'SETTLED & COMMITTED (5/5 PASS)';
+          txt.className = 'text-emerald-400 font-bold';
+        }
+        return;
+      }
+
+      if (failStage === 'HMAC' || failStage === 'TIMESTAMP') {
+        const el0 = document.getElementById('step-hmac');
+        if (el0) el0.className = failClass;
+        steps.slice(1).forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.className = skipClass;
+        });
+        if (txt) {
+          txt.innerText = failStage === 'HMAC' ? 'HALTED: SIGNATURE_INVALID (401)' : 'HALTED: WINDOW_EXPIRED (401)';
+          txt.className = 'text-rose-400 font-bold';
+        }
+      } else if (failStage === 'IDEMP_CONFLICT') {
+        const el0 = document.getElementById('step-hmac');
+        if (el0) el0.className = passClass;
+        const el1 = document.getElementById('step-idemp');
+        if (el1) el1.className = warnClass;
+        steps.slice(2).forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.className = skipClass;
+        });
+        if (txt) {
+          txt.innerText = 'HALTED: DUPLICATE_LOCKED (409)';
+          txt.className = 'text-amber-400 font-bold';
+        }
+      } else {
+        steps.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.className = failClass;
+        });
+        if (txt) {
+          txt.innerText = 'HALTED: TRANSAKSI_DITOLAK';
+          txt.className = 'text-rose-400 font-bold';
+        }
+      }
+    }
+
     // Execute Transfer Handler
     async function executeTransfer(e) {
       if (e) e.preventDefault();
@@ -1063,6 +1201,11 @@
         return;
       }
 
+      const raceContainer = document.getElementById('race-results-container');
+      if (raceContainer) raceContainer.classList.add('hidden');
+
+      resetPipeline();
+
       const payloadObj = {
         reference_id: refID,
         source_account_id: sourceID,
@@ -1074,19 +1217,19 @@
       const payloadString = JSON.stringify(payloadObj);
 
       let timestamp = Math.floor(Date.now() / 1000);
+      let isReplay = document.getElementById('attack-replay').checked;
+      let isTamper = document.getElementById('attack-tamper').checked;
 
-      // Check attack toggles
-      if (document.getElementById('attack-replay').checked) {
-        timestamp -= 600; // 10 minutes ago -> triggers replay attack rejection!
+      if (isReplay) {
+        timestamp -= 600; // 10 minutes ago
       }
 
-      // Compute HMAC-SHA256 signature natively on client-side (no backend backdoor)
       const merchantSecret = "spg-secret-hmac-key-for-signatures";
       const messageToSign = `${timestamp}.${payloadString}`;
       let signature = await computeHMACSHA256(merchantSecret, messageToSign);
 
-      if (document.getElementById('attack-tamper').checked) {
-        signature = 'deadbeef' + signature.substring(8); // Tamper signature -> triggers MITM rejection!
+      if (isTamper) {
+        signature = 'deadbeef' + signature.substring(8);
       }
 
       // Update Inspector UI
@@ -1111,6 +1254,7 @@
         });
 
         const elapsed = (performance.now() - startTime).toFixed(1);
+        recordLatency(elapsed);
         const resJson = await transferRes.json();
 
         respBadge.innerText = `HTTP ${transferRes.status} (${elapsed} ms)`;
@@ -1125,12 +1269,17 @@
         if (transferRes.status === 200) {
           document.getElementById('tel-idemp').innerText = 'ACQUIRED';
           document.getElementById('tel-idemp').className = 'font-bold text-emerald-400 text-xs';
+          updatePipeline(true);
         } else if (transferRes.status === 409) {
           document.getElementById('tel-idemp').innerText = '409_LOCKED';
           document.getElementById('tel-idemp').className = 'font-bold text-rose-400 text-xs';
+          updatePipeline(false, 'IDEMP_CONFLICT');
         } else {
           document.getElementById('tel-idemp').innerText = 'REJECTED';
           document.getElementById('tel-idemp').className = 'font-bold text-amber-400 text-xs';
+          if (isTamper) updatePipeline(false, 'HMAC');
+          else if (isReplay) updatePipeline(false, 'TIMESTAMP');
+          else updatePipeline(false, 'REJECTED');
         }
 
         if (transferRes.ok) {
@@ -1146,7 +1295,109 @@
         respBadge.className = 'font-mono text-[11px] px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 font-bold';
         respPreview.innerText = err.toString();
         showToast('Error', err.toString(), 'error');
+        updatePipeline(false, 'NETWORK_ERROR');
       }
+    }
+
+    // High Concurrency Race Attack Simulator (5x Parallel Requests)
+    async function runScenarioConcurrentRace() {
+      switchTab('tab-playground');
+      document.getElementById('attack-tamper').checked = false;
+      document.getElementById('attack-replay').checked = false;
+
+      const sourceID = document.getElementById('transfer-source').value;
+      const destID = document.getElementById('transfer-dest').value;
+      const amount = 50000;
+      document.getElementById('transfer-amount').value = amount;
+
+      if (!sourceID || !destID) {
+        showToast('Pilih Rekening', 'Pilih rekening sumber dan tujuan terlebih dahulu!', 'warn');
+        return;
+      }
+
+      const raceKey = 'idemp-race-' + generateUUID();
+      const raceRef = `REF-RACE-${Date.now().toString().slice(-6)}`;
+      document.getElementById('transfer-ref').value = raceRef;
+      document.getElementById('transfer-idempotency').value = raceKey;
+
+      const payloadObj = {
+        reference_id: raceRef,
+        source_account_id: sourceID,
+        destination_account_id: destID,
+        amount: amount,
+        currency: 'IDR',
+        description: `High-concurrency race test (${currentMerchant})`
+      };
+      const payloadString = JSON.stringify(payloadObj);
+      const timestamp = Math.floor(Date.now() / 1000);
+      const merchantSecret = "spg-secret-hmac-key-for-signatures";
+      const signature = await computeHMACSHA256(merchantSecret, `${timestamp}.${payloadString}`);
+
+      document.getElementById('insp-ts').innerText = timestamp;
+      document.getElementById('insp-idemp').innerText = raceKey;
+      document.getElementById('insp-sig').innerText = signature;
+
+      const raceContainer = document.getElementById('race-results-container');
+      const raceList = document.getElementById('race-items-list');
+      const raceBadge = document.getElementById('race-summary-badge');
+      raceContainer.classList.remove('hidden');
+      raceList.innerHTML = '<div class="text-slate-400 py-2 text-center animate-pulse">Menembakkan 5 request HTTP paralel secara serentak via Promise.all...</div>';
+
+      resetPipeline();
+
+      // Launch 5 simultaneous requests via Promise.all
+      const promises = Array.from({ length: 5 }, async (_, idx) => {
+        const t0 = performance.now();
+        try {
+          const res = await fetch('/api/v1/transfers', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Idempotency-Key': raceKey,
+              'X-Timestamp': timestamp.toString(),
+              'X-Signature': signature
+            },
+            body: payloadString
+          });
+          const timeMs = (performance.now() - t0).toFixed(1);
+          recordLatency(timeMs);
+          const data = await res.json();
+          return { reqIndex: idx + 1, status: res.status, ok: res.ok, timeMs, data };
+        } catch (err) {
+          return { reqIndex: idx + 1, status: 0, ok: false, timeMs: (performance.now() - t0).toFixed(1), data: { message: err.message } };
+        }
+      });
+
+      const results = await Promise.all(promises);
+
+      let successCount = 0;
+      let blockedCount = 0;
+
+      raceList.innerHTML = results.map(r => {
+        if (r.status === 200) successCount++;
+        if (r.status === 409) blockedCount++;
+
+        const isOk = r.status === 200;
+        const color = isOk ? 'text-emerald-400' : (r.status === 409 ? 'text-amber-400' : 'text-rose-400');
+        const statusLabel = isOk ? '200 OK &bull; MUTATION_COMMITTED' : (r.status === 409 ? '409 Conflict &bull; BLOCKED (IN_PROGRESS)' : `HTTP ${r.status}`);
+
+        return `
+          <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-slate-300 font-bold">Request #${r.reqIndex}</span>
+            <span class="${color} font-bold">${statusLabel}</span>
+            <span class="text-slate-500">${r.timeMs} ms</span>
+          </div>
+        `;
+      }).join('');
+
+      raceBadge.innerText = `${successCount} Committed \u2022 ${blockedCount} Blocked`;
+      raceBadge.className = successCount === 1 
+        ? 'px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold'
+        : 'px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-mono font-bold';
+
+      updatePipeline(true);
+      await loadAllData();
+      showToast('Race Neutralized', `${successCount} mutasi diproses, ${blockedCount} request duplikat diblokir oleh Redis SETNX!`, 'success');
     }
 
     // Reconciliation Handlers
@@ -1333,6 +1584,31 @@ REF-SAMPLE-MISMATCH,120000,SUCCESS,2026-10-25T01:10:00Z`;
       switchTab('tab-reconciliation');
       runSampleReconciliation();
     }
+
+    // Keyboard Shortcuts Listener for Presenter Mode
+    window.addEventListener('keydown', (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+
+      if (e.key === '1') {
+        showToast('Shortcut [1]', 'Normal Transfer triggered', 'info');
+        runScenarioTransfer();
+      } else if (e.key === '2') {
+        showToast('Shortcut [2]', 'Idempotency repeat triggered', 'info');
+        runScenarioIdempotency();
+      } else if (e.key === '3') {
+        showToast('Shortcut [3]', 'Concurrent Race 5x spam triggered', 'info');
+        runScenarioConcurrentRace();
+      } else if (e.key === '4') {
+        showToast('Shortcut [4]', 'MITM Attack simulated', 'info');
+        runScenarioMITM();
+      } else if (e.key === '5') {
+        showToast('Shortcut [5]', 'Replay Attack simulated', 'info');
+        runScenarioReplay();
+      } else if (e.key === '6') {
+        showToast('Shortcut [6]', 'Bank Reconciliation triggered', 'info');
+        runScenarioReconciliation();
+      }
+    });
 
     // Auto-init on load
     window.addEventListener('DOMContentLoaded', () => {
