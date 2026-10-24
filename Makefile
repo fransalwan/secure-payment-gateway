@@ -1,4 +1,4 @@
-.PHONY: all build run worker test clean docker-up docker-down
+.PHONY: all build run worker test clean docker-up docker-down k6 tunnel tunnel-ngrok
 
 all: build
 
@@ -24,4 +24,10 @@ docker-down:
 
 k6:
 	@k6 run scripts/k6_load_test.js
+
+tunnel:
+	@powershell -ExecutionPolicy Bypass -File scripts/tunnel.ps1
+
+tunnel-ngrok:
+	@powershell -ExecutionPolicy Bypass -File scripts/tunnel.ps1 -Provider ngrok
 

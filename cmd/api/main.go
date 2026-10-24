@@ -20,6 +20,7 @@ import (
 	"github.com/fransalwan/secure-payment-gateway/pkg/response"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 )
 
 func main() {
@@ -65,6 +66,16 @@ func main() {
 	reconHandler := httphandler.NewReconciliationHandler(reconService)
 
 	r := chi.NewRouter()
+
+	// CORS Configuration for Tunnel & Cross-Origin Public Demos
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Idempotency-Key", "X-Timestamp", "X-Signature", "ngrok-skip-browser-warning"},
+		ExposedHeaders:   []string{"Link", "X-Idempotency-Key"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
 
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)

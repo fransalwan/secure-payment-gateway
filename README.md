@@ -258,6 +258,20 @@ Server akan aktif di `http://localhost:8080`. Buka browser untuk melihat dashboa
 go run ./cmd/worker
 ```
 
+### 6. Live Remote Demo via Public Tunnel (Cloudflare / ngrok)
+Aplikasi ini sudah **100% Tunnel-Ready** (termasuk dukungan CORS dinamis untuk *preflight* `OPTIONS`, custom signature headers, dan relative endpoint routing):
+```bash
+# Jalankan tunnel otomatis (Zero-Config via Cloudflare Tunnel):
+make tunnel
+# Atau di PowerShell:
+.\scripts\tunnel.ps1
+
+# Atau paksa menggunakan ngrok:
+make tunnel-ngrok
+```
+Perintah ini langsung menghasilkan URL publik bertaraf HTTPS (contoh: `https://xxxx.trycloudflare.com`) yang dapat dibuka oleh interviewer di perangkat mana pun tanpa perlu instalasi tambahan.
+
+
 ---
 
 ## 📊 Benchmark & Performance Targets (k6)
