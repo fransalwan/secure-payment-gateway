@@ -93,3 +93,8 @@ jobs:
           HMAC_SECRET_KEY: "spg-secret-hmac-key-for-signatures"
           WEBHOOK_SECRET: "spg-webhook-secret-hmac-2026"
         run: go test -v -race ./...
+
+      - name: Validate Production Compose & Multi-Stage Docker Image Build
+        run: |
+          docker compose -f docker-compose.prod.yml config --quiet
+          docker build -t spg-oms:ci .

@@ -12,6 +12,10 @@ bin/
 
 # Environment files
 .env
+.env.local
+.env.prod
+!.env.example
+!.env.prod.example
 
 # OS files
 .DS_Store

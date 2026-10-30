@@ -1,0 +1,17 @@
+{$APP_DOMAIN::80} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy oms-api:8080 {
+		health_uri /health
+		health_interval 15s
+		health_timeout 5s
+	}
+}
+

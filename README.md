@@ -145,6 +145,16 @@ make tunnel
 .\scripts\tunnel.ps1
 ```
 
+### 7. Production Multi-Container Deployment (Docker Compose + Auto-HTTPS Caddy)
+Repository ini sudah dilengkapi [`Dockerfile`](Dockerfile) *multi-stage* (Node 22 + Go Alpine + *non-root runtime*), [`docker-compose.prod.yml`](docker-compose.prod.yml) dengan pemisahan container `oms-api` (`ENABLE_EMBEDDED_WORKER=false`) dan `oms-worker`, serta reverse proxy `Caddy` untuk HTTPS otomatis:
+
+```bash
+chmod +x scripts/deploy-vps.sh
+./scripts/deploy-vps.sh oms.yourdomain.my.id
+```
+
+Lihat panduan lengkap provisioning VPS lokal (QRIS), custom domain, dan Cloudflare WAF di [`docs/DEPLOYMENT_PRODUCTION.md`](docs/DEPLOYMENT_PRODUCTION.md).
+
 ---
 
 ## 👨‍💻 Author & Engineering Contact

@@ -1,0 +1,165 @@
+# ==============================================================================
+# Production Multi-Container Stack (IDCloudHost / Cloud VPS + Auto-HTTPS Caddy)
+# Topology:
+#   [Internet :80/:443] -> [caddy] -> [oms-api :8080] -> [postgres:16] & [redis:7]
+#                                  -> [oms-worker]    -> [postgres:16] & [redis:7]
+#
+# Usage:
+#   cp .env.prod.example .env.prod   # (or run ./scripts/deploy-vps.sh)
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+# ==============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: spg-prod-postgres
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Jakarta
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me_strong_db_password}
+      POSTGRES_DB: ${DB_NAME:-secure_payment_gateway}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - oms_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: spg-prod-redis
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Jakarta
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command: >
+      sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then
+        exec redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy volatile-lru --requirepass "$$REDIS_PASSWORD";
+      else
+        exec redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy volatile-lru;
+      fi'
+    volumes:
+      - redis_prod_data:/data
+    networks:
+      - oms_internal
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  oms-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: spg-oms:latest
+    container_name: spg-prod-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_PORT: "8080"
+      APP_ENV: production
+      # Decouple HTTP Webhook/API receiver from background queue processing
+      ENABLE_EMBEDDED_WORKER: "false"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-change_me_strong_db_password}
+      DB_NAME: ${DB_NAME:-secure_payment_gateway}
+      DB_SSLMODE: disable
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-25}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-10}
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: "0"
+      AES_SECRET_KEY: ${AES_SECRET_KEY:-01234567890123456789012345678901}
+      HMAC_SECRET_KEY: ${HMAC_SECRET_KEY:-change_me_prod_hmac_secret_key}
+      HMAC_TIMESTAMP_TOLERANCE_SECONDS: ${HMAC_TIMESTAMP_TOLERANCE_SECONDS:-300}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-change_me_prod_webhook_secret}
+      WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS: ${WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS:-300}
+      IDEMPOTENCY_TTL_SECONDS: ${IDEMPOTENCY_TTL_SECONDS:-120}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+    networks:
+      - oms_internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+  oms-worker:
+    image: spg-oms:latest
+    container_name: spg-prod-worker
+    restart: unless-stopped
+    command: ["/app/spg-worker"]
+    depends_on:
+      oms-api:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-change_me_strong_db_password}
+      DB_NAME: ${DB_NAME:-secure_payment_gateway}
+      DB_SSLMODE: disable
+      DB_MAX_OPEN_CONNS: "10"
+      DB_MAX_IDLE_CONNS: "5"
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: "0"
+      AES_SECRET_KEY: ${AES_SECRET_KEY:-01234567890123456789012345678901}
+      HMAC_SECRET_KEY: ${HMAC_SECRET_KEY:-change_me_prod_hmac_secret_key}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-change_me_prod_webhook_secret}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+    networks:
+      - oms_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f spg-worker >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: spg-prod-caddy
+    restart: unless-stopped
+    depends_on:
+      oms-api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-:80}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - oms_internal
+
+networks:
+  oms_internal:
+    driver: bridge
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+  caddy_data:
+  caddy_config:
+

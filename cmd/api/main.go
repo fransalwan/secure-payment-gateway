@@ -116,13 +116,15 @@ func main() {
 	r.Use(custommiddleware.RecovererMiddleware)
 	r.Use(chimiddleware.Timeout(30 * time.Second))
 
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+	healthHandler := func(w http.ResponseWriter, r *http.Request) {
 		response.OK(w, "Omni-Channel OMS & Secure Payment Gateway is active and healthy", map[string]string{
 			"status":        "UP",
 			"queue_backend": queueRepo.BackendName(),
 			"time":          time.Now().UTC().Format(time.RFC3339),
 		})
-	})
+	}
+	r.Get("/health", healthHandler)
+	r.Head("/health", healthHandler)
 
 	// Serve Vue 3 + TypeScript + Pinia Operational Dashboard (web/dist)
 	distDir := filepath.Join("web", "dist")

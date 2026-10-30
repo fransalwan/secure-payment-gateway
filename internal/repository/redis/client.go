@@ -11,11 +11,23 @@ import (
 )
 
 func NewRedisClient(cfg *config.Config) (*redis.Client, error) {
-	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.RedisAddr,
-		Password: cfg.RedisPassword,
-		DB:       cfg.RedisDB,
-	})
+	var opts *redis.Options
+	if cfg.RedisURL != "" {
+		parsedOpts, err := redis.ParseURL(cfg.RedisURL)
+		if err != nil {
+			slog.Warn("Invalid REDIS_URL format, idempotency engine will use in-memory fallback", "err", err)
+			return nil, fmt.Errorf("invalid redis url: %w", err)
+		}
+		opts = parsedOpts
+	} else {
+		opts = &redis.Options{
+			Addr:     cfg.RedisAddr,
+			Password: cfg.RedisPassword,
+			DB:       cfg.RedisDB,
+		}
+	}
+
+	client := redis.NewClient(opts)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -13,6 +15,7 @@ type Config struct {
 	AppEnv  string
 
 	// Database
+	DatabaseURL    string
 	DBHost         string
 	DBPort         string
 	DBUser         string
@@ -23,6 +26,7 @@ type Config struct {
 	DBMaxIdleConns int
 
 	// Redis
+	RedisURL      string
 	RedisAddr     string
 	RedisPassword string
 	RedisDB       int
@@ -42,9 +46,17 @@ type Config struct {
 }
 
 func (c *Config) GetDSN() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName, c.DBSSLMode,
-	)
+	if c.DatabaseURL != "" {
+		return c.DatabaseURL
+	}
+	u := &url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(c.DBUser, c.DBPassword),
+		Host:     net.JoinHostPort(c.DBHost, c.DBPort),
+		Path:     c.DBName,
+		RawQuery: "sslmode=" + url.QueryEscape(c.DBSSLMode),
+	}
+	return u.String()
 }
 
 func LoadConfig() (*Config, error) {
@@ -66,9 +78,15 @@ func LoadConfig() (*Config, error) {
 	idempotencyTTL, _ := strconv.Atoi(getEnv("IDEMPOTENCY_TTL_SECONDS", "120"))
 	enableWorker := getEnv("ENABLE_EMBEDDED_WORKER", "true") != "false"
 
+	appPort := getEnv("APP_PORT", "")
+	if appPort == "" {
+		appPort = getEnv("PORT", "8080")
+	}
+
 	return &Config{
-		AppPort:                   getEnv("APP_PORT", "8080"),
+		AppPort:                   appPort,
 		AppEnv:                    getEnv("APP_ENV", "development"),
+		DatabaseURL:               getEnv("DATABASE_URL", ""),
 		DBHost:                    getEnv("DB_HOST", "localhost"),
 		DBPort:                    getEnv("DB_PORT", "5432"),
 		DBUser:                    getEnv("DB_USER", "postgres"),
@@ -77,6 +95,7 @@ func LoadConfig() (*Config, error) {
 		DBSSLMode:                 getEnv("DB_SSLMODE", "disable"),
 		DBMaxOpenConns:            maxOpenConns,
 		DBMaxIdleConns:            maxIdleConns,
+		RedisURL:                  getEnv("REDIS_URL", ""),
 		RedisAddr:                 getEnv("REDIS_ADDR", "localhost:6379"),
 		RedisPassword:             getEnv("REDIS_PASSWORD", ""),
 		RedisDB:                   redisDB,

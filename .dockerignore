@@ -1,0 +1,45 @@
+# Version control & CI
+.git
+.github
+
+# Local binaries & test outputs
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+!.env.prod.example
+
+# Frontend node_modules & prebuilt dist (rebuilt freshly in Stage 1)
+frontend/node_modules/
+*.tsbuildinfo
+web/dist/
+
+# IDE, OS & local notes
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+interview-prep/
+.interview/
+.notes/
+*cheatsheet*
+*CHEATSHEET*
+*interview*
+*INTERVIEW*
+*.pdf
+*.pptx
+*.ppt
+docs/
+README.md
+AI_WORKFLOW.md
+

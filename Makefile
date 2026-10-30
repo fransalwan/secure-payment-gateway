@@ -1,4 +1,4 @@
-.PHONY: all build frontend-build frontend-dev run worker test clean docker-up docker-down k6 tunnel tunnel-ngrok
+.PHONY: all build frontend-build frontend-dev run worker test clean docker-up docker-down prod-up prod-down prod-logs k6 tunnel tunnel-ngrok
 
 all: frontend-build build
 
@@ -28,6 +28,15 @@ docker-up:
 
 docker-down:
 	@docker compose down
+
+prod-up:
+	@docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build --remove-orphans
+
+prod-down:
+	@docker compose --env-file .env.prod -f docker-compose.prod.yml down
+
+prod-logs:
+	@docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f oms-api oms-worker caddy
 
 k6:
 	@k6 run scripts/k6_load_test.js
