@@ -68,7 +68,7 @@ flowchart TB
 | `pkg/crypto/` | Primitif keamanan: `AES-256-GCM`, `HMAC-SHA256` (*constant-time*), dan `SHA-256` *hash chain*. | Jangan pernah mengganti `hmac.Equal` dengan operator `==` biasa untuk menghindari *timing side-channel attack*. |
 | `pkg/reconciliation/` | Streaming CSV parser untuk pencocokan mutasi penyelesaian bank. | Memproses baris secara bertahap agar konsumsi memori tetap rendah pada file besar. |
 | `migrations/` | Skrip DDL PostgreSQL berurutan (`000001` s/d `000003`) beserta skrip *rollback* (`.down.sql`). | File `.up.sql` wajib ditulis idempotent (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`) agar aman dijalankan ulang saat *startup*. |
-| `frontend/` | Source code aplikasi SPA **Vue 3 + TypeScript + Pinia + Tailwind CSS v4**. | Hasil build (`npm run build`) dikompilasi langsung ke `../web/dist` untuk disajikan oleh Go binary. |
+| `frontend/` | Source code aplikasi SPA **Vue 3 + TypeScript + Pinia + Tailwind CSS v4 + `shadcn-vue` (`Reka UI` & `Vaul` Mobile Drawer)**. | Hasil build (`npm run build`) dikompilasi langsung ke `../web/dist` untuk disajikan oleh Go binary. |
 
 ---
 

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { toast } from 'vue-sonner'
 import type {
   Merchant,
   Product,
@@ -68,6 +69,12 @@ export const useOmsStore = defineStore('oms', () => {
     setTimeout(() => {
       toasts.value = toasts.value.filter((t) => t.id !== id)
     }, 4500)
+
+    const opts = detail ? { description: detail } : undefined
+    if (type === 'success') toast.success(title, opts)
+    else if (type === 'error') toast.error(title, opts)
+    else if (type === 'warning') toast.warning(title, opts)
+    else toast.info(title, opts)
   }
 
   const activeMerchant = computed(() =>

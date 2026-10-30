@@ -1,28 +1,92 @@
 @import "tailwindcss";
 
+/* Reflect <meta name="color-scheme"> override in CSS (per modern-web-guidance: dark-mode-toggle) */
+:root {
+  color-scheme: light dark;
+
+  &:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+  }
+  &:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+  }
+
+  /* Semantic shadcn-vue tokens powered by native CSS light-dark() */
+  --bg-canvas: light-dark(#f8fafc, #09090b);
+  --bg-card: light-dark(#ffffff, #111114);
+  --bg-elevated: light-dark(#f1f5f9, #18181b);
+  --bg-muted: light-dark(#f4f4f5, #1f1f23);
+  --bg-sidebar: light-dark(#ffffff, #0c0c0f);
+  --fg-primary: light-dark(#09090b, #fafafa);
+  --fg-secondary: light-dark(#3f3f46, #d4d4d8);
+  --fg-muted: light-dark(#71717a, #a1a1aa);
+  --border-default: light-dark(#e4e4e7, #27272a);
+  --border-subtle: light-dark(#f1f5f9, #1e1e22);
+  --ring-focus: light-dark(#10b981, #34d399);
+
+  /* High-contrast semantic tone text colors via native light-dark() */
+  --fg-emerald: light-dark(#047857, #6ee7b7);
+  --fg-amber: light-dark(#b45309, #fcd34d);
+  --fg-rose: light-dark(#be123c, #fda4af);
+  --fg-indigo: light-dark(#4338ca, #a5b4fc);
+  --fg-sky: light-dark(#0369a1, #7dd3fc);
+  --fg-orange: light-dark(#c2410c, #fdba74);
+  --fg-pink: light-dark(#be185d, #f9a8d4);
+}
+
+@theme {
+  --color-background: var(--bg-canvas);
+  --color-card: var(--bg-card);
+  --color-elevated: var(--bg-elevated);
+  --color-muted: var(--bg-muted);
+  --color-sidebar: var(--bg-sidebar);
+  --color-foreground: var(--fg-primary);
+  --color-secondary-foreground: var(--fg-secondary);
+  --color-muted-foreground: var(--fg-muted);
+  --color-border: var(--border-default);
+  --color-border-subtle: var(--border-subtle);
+  --color-ring: var(--ring-focus);
+  --color-tone-emerald: var(--fg-emerald);
+  --color-tone-amber: var(--fg-amber);
+  --color-tone-rose: var(--fg-rose);
+  --color-tone-indigo: var(--fg-indigo);
+  --color-tone-sky: var(--fg-sky);
+  --color-tone-orange: var(--fg-orange);
+  --color-tone-pink: var(--fg-pink);
+}
+
 @layer base {
   body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-canvas);
+    color: var(--fg-primary);
   }
-  code, pre, .font-mono {
+  code,
+  pre,
+  .font-mono {
     font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
   }
 }
 
-/* Native <dialog> scroll containment & backdrop (per modern-web-guidance: dialog & light-dismiss-a-dialog) */
-dialog:modal {
-  overscroll-behavior: contain;
-  margin: auto;
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
-dialog::backdrop {
-  overflow: hidden;
-  overscroll-behavior: contain;
-  background-color: rgba(2, 6, 23, 0.78);
-  backdrop-filter: blur(5px);
+/* Safe area padding for iOS/Android bottom navigation bar */
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 
-/* Layout isolation for high-frequency live dashboard panels (per interactions-in-complex-layouts) */
+/* Hide horizontal scrollbar on touch filter chips while keeping keyboard/touch scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Layout isolation for high-frequency live dashboard panels */
 .oms-panel {
   content-visibility: auto;
   contain-intrinsic-size: auto 320px auto 480px;
@@ -34,16 +98,119 @@ dialog::backdrop {
   }
 }
 
-/* Accessible & container-aware responsive data tables (per responsive-table) */
+/* Container-aware responsive data tables -> mobile stacked cards (per modern-web-guidance: responsive-table & size-aware-styling) */
 .table-wrapper {
+  overflow: auto;
+  max-inline-size: 100%;
   container-type: inline-size;
-  overflow-x: auto;
 }
 
-.table-wrapper thead th {
+.responsive-data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.responsive-data-table thead {
   position: sticky;
   inset-block-start: 0;
   z-index: 2;
+}
+
+.responsive-data-table tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background-color: var(--bg-card);
+}
+
+@container (width < 640px) {
+  .responsive-data-table,
+  .responsive-data-table thead,
+  .responsive-data-table tbody,
+  .responsive-data-table tr,
+  .responsive-data-table th,
+  .responsive-data-table td {
+    display: block;
+  }
+
+  .responsive-data-table thead {
+    /* MANDATORY: Hide column header from layout and screen readers */
+    display: none;
+  }
+
+  .responsive-data-table tbody tr.data-row {
+    margin: 0.75rem;
+    border: 1px solid var(--border-default);
+    border-radius: 0.875rem;
+    background-color: var(--bg-card);
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  .responsive-data-table tbody th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    background-color: var(--bg-elevated);
+    border-bottom: 1px solid var(--border-default);
+    padding: 0.75rem 1rem;
+  }
+
+  .responsive-data-table tbody td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    text-align: right;
+  }
+
+  .responsive-data-table tbody td:last-child {
+    border-bottom: none;
+    padding-top: 0.75rem;
+    padding-bottom: 0.875rem;
+    justify-content: stretch;
+  }
+
+  .responsive-data-table tbody td:nth-child(2)::before {
+    content: var(--label-2) ": ";
+    font-weight: 600;
+    color: var(--fg-muted);
+    text-align: left;
+    flex-shrink: 0;
+  }
+  .responsive-data-table tbody td:nth-child(3)::before {
+    content: var(--label-3) ": ";
+    font-weight: 600;
+    color: var(--fg-muted);
+    text-align: left;
+    flex-shrink: 0;
+  }
+  .responsive-data-table tbody td:nth-child(4)::before {
+    content: var(--label-4) ": ";
+    font-weight: 600;
+    color: var(--fg-muted);
+    text-align: left;
+    flex-shrink: 0;
+  }
+  .responsive-data-table tbody td:nth-child(5)::before {
+    content: var(--label-5) ": ";
+    font-weight: 600;
+    color: var(--fg-muted);
+    text-align: left;
+    flex-shrink: 0;
+  }
+}
+
+/* Respect reduced motion for View Transitions (per modern-web-guidance: same-document-transitions) */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
 /* Custom subtle scrollbars */
@@ -52,11 +219,15 @@ dialog::backdrop {
   height: 6px;
 }
 .custom-scroll::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: light-dark(#cbd5e1, #3f3f46);
   border-radius: 9999px;
 }
 
-/* Thermal A6 Shipping Waybill Print Stylesheet */
+/* Thermal A6 Shipping Waybill Print Stylesheet (Always crisp white paper) */
+#thermal-waybill-sheet {
+  color-scheme: light;
+}
+
 @media print {
   @page {
     size: 100mm 150mm;
@@ -82,4 +253,3 @@ dialog::backdrop {
     margin: 0 !important;
   }
 }
-

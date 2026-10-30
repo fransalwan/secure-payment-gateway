@@ -1,10 +1,10 @@
 # Omni-Channel Mini E-Commerce OMS & Secure Payment Gateway
 
 > **Production-Grade B2B Merchant Order Management System (OMS), Anti-Overselling Inventory Engine & Zero-Trust Payment Gateway**  
-> Built with **Vue 3 + TypeScript + Pinia**, **Golang (Chi + pgx/v5)**, **PostgreSQL 16**, and **Redis 7**.
+> Built with **Vue 3 + TypeScript + Pinia + `shadcn-vue` (`Reka UI` & `Vaul`)**, **Golang (Chi + pgx/v5)**, **PostgreSQL 16**, and **Redis 7**.
 
 [![Go Version](https://img.shields.io/badge/Go-1.22%2B-blue.svg)](https://golang.org)
-[![Frontend](https://img.shields.io/badge/Frontend-Vue%203%20%2B%20TypeScript%20%2B%20Pinia-42b883.svg)](https://vuejs.org/)
+[![Frontend](https://img.shields.io/badge/Frontend-Vue%203%20%2B%20TS%20%2B%20shadcn--vue-42b883.svg)](https://www.shadcn-vue.com/)
 [![CI Pipeline](https://github.com/fransalwan/secure-payment-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/fransalwan/secure-payment-gateway/actions/workflows/ci.yml)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%2016-blue.svg)](https://www.postgresql.org/)
 [![Queue & Lock](https://img.shields.io/badge/Queue%20%26%20Lock-Redis%207-red.svg)](https://redis.io/)
@@ -19,7 +19,7 @@ Platform B2B Merchant yang menyatukan pesanan dari **Web Checkout**, **Marketpla
 2. **Multi-Channel 3-State Inventory & Anti-Overselling Engine**: Penguncian baris deterministik PostgreSQL (`SELECT ... FOR UPDATE` + `WHERE available_stock >= $1`) dengan 3 status stok (`available_stock`, `reserved_stock`, `sold_stock`) yang menjamin **nol stok minus (*zero overselling*)** saat *flash sale*.
 3. **Secure Payment Gateway & Idempotent Webhook**: Verifikasi tanda tangan *constant-time* `HMAC-SHA256`, proteksi *replay attack* (`<= 5 menit`), deduplikasi atomik `UNIQUE(provider, external_event_id)` di `webhook_events` (`< 50ms` fast ACK), dan pembukuan akuntansi berpasangan (*Double-Entry Ledger*).
 4. **Asynchronous Redis Queue, Exponential Backoff & DLQ**: Pemrosesan *Logistics Waybill Generator* (`JNE`, `J&T`, `SiCepat`), sinkronisasi stok marketplace, dan notifikasi WA dengan *Exponential Backoff* (`2s, 4s, 8s, 16s`) serta *Dead-Letter Queue* (`system_error_logs`).
-5. **Vue 3 + TypeScript + Pinia Operational Dashboard**: 4 panel operasional lengkap dengan **Stress-Test Lab** (*10 Concurrent Buyers vs 1 Last Stock* & *5x Duplicate Payment Webhook*) serta cetak resi **Thermal A6 (`100x150mm`)**.
+5. **Modern Mobile-First `shadcn-vue` SaaS UI**: Arsitektur antarmuka **Vue 3 + TypeScript + Pinia + `Reka UI` + `Vaul`** dengan *Adaptive App Shell* (Desktop Sidebar & Mobile Bottom Bar), *Container-Query Responsive Table-to-Card*, *Command Palette (`Ctrl+K`)*, *Native CSS `light-dark()` Dual Theme*, **Microsecond Lock Waterfall Lab**, serta cetak resi **Thermal A6 (`100x150mm`)**.
 
 ---
 
@@ -39,8 +39,8 @@ Repositori ini dilengkapi dokumentasi teknis terstruktur untuk mempermudah *onbo
 
 ```
 +-------------------------------------------------------------------------+
-|              FRONTEND: Vue 3 + TypeScript + Pinia + Tailwind            |
-|  [Unified Order Inbox] [3-State Stock] [Stress Lab] [Queue/DLQ Monitor] |
+|     FRONTEND: Vue 3 + TypeScript + Pinia + shadcn-vue (Reka UI/Vaul)    |
+|  [Mobile-First Shell] [Ctrl+K Command] [3-State Stock] [Waterfall Lab]  |
 +-------------------+---------------------------------+-------------------+
                     | REST API (JSON)                 | Simulasi Webhook
                     v                                 v (HMAC-SHA256)
@@ -70,6 +70,14 @@ Repositori ini dilengkapi dokumentasi teknis terstruktur untuk mempermudah *onbo
                                         |  - Sync Marketplace Stock       |
                                         +---------------------------------+
 ```
+
+---
+
+## 🎨 Modern Web & Mobile-First UI Architecture
+
+* **`shadcn-vue` (`Reka UI`) + `Vaul` Adaptive Overlays**: Komponen `ResponsiveDialog` menyajikan *accessible modal / right slide-over sheet* di Desktop (`>= 768px`) dan otomatis bertransformasi menjadi **Swipeable Bottom Sheet** ber-unit `dvh` (*Dynamic Viewport Height*) di Mobile (`< 768px`) sehingga tidak terpotong oleh *virtual keyboard*.
+* **CSS `@container` Query Responsive Tables**: Tabel pesanan, inventori, dan buku besar otomatis berubah dari tabel multi-kolom ber-*sticky header* menjadi **Actionable Mobile Fulfillment Cards** saat lebar kontainer `< 640px`.
+* **Native CSS `light-dark()` Dual Theme & SPA View Transitions**: Mendukung tema *System / Light / Dark* bebas FOUC melalui `<meta name="color-scheme">` serta transisi mulus menggunakan `document.startViewTransition` dan notifikasi `vue-sonner`.
 
 ---
 
@@ -144,4 +152,4 @@ make tunnel
 * **Engineer**: Frans Alwan Purba
 * **Email**: [fransalwan55@gmail.com](mailto:fransalwan55@gmail.com)
 * **GitHub**: [github.com/fransalwan](https://github.com/fransalwan)
-* **Education**: Master of Computer Science in Artificial Intelligence @ Universitas Gadjah Mada (UGM)
+* **Education**: Master of Artificial Intelligence @ Universitas Gadjah Mada (UGM)
