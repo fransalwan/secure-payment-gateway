@@ -1,6 +1,13 @@
-.PHONY: all build run worker test clean docker-up docker-down k6 tunnel tunnel-ngrok
+.PHONY: all build frontend-build frontend-dev run worker test clean docker-up docker-down k6 tunnel tunnel-ngrok
 
-all: build
+all: frontend-build build
+
+frontend-build:
+	@echo "Building Vue 3 + TypeScript + Pinia Dashboard..."
+	@cd frontend && npm run build
+
+frontend-dev:
+	@cd frontend && npm run dev
 
 build:
 	@echo "Building API server and Worker..."

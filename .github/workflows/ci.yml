@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Build, Lint & Concurrency Race Detection
+    name: Build, Type-Check & Concurrency Race Detection
     runs-on: ubuntu-latest
 
     services:
@@ -54,7 +54,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Install Dependencies
+      - name: Setup Node.js for Vue 3 Frontend
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Type-Check & Build Vue 3 + TypeScript + Pinia Dashboard
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install Go Dependencies
         run: go mod download
 
       - name: Apply Database Migrations
@@ -62,11 +75,12 @@ jobs:
           sudo apt-get install -y postgresql-client
           PGPASSWORD=postgres psql -h localhost -U postgres -d secure_payment_gateway -f migrations/000001_init_schema.up.sql
           PGPASSWORD=postgres psql -h localhost -U postgres -d secure_payment_gateway -f migrations/000002_reconciliation_schema.up.sql
+          PGPASSWORD=postgres psql -h localhost -U postgres -d secure_payment_gateway -f migrations/000003_oms_schema.up.sql
 
-      - name: Build All Packages
+      - name: Build All Go Packages
         run: go build -v ./...
 
-      - name: Run Tests with Race Detector (-race)
+      - name: Run Critical Integration Tests with Race Detector (-race)
         env:
           DB_HOST: localhost
           DB_PORT: 5432
@@ -77,4 +91,5 @@ jobs:
           REDIS_ADDR: localhost:6379
           AES_SECRET_KEY: "01234567890123456789012345678901"
           HMAC_SECRET_KEY: "spg-secret-hmac-key-for-signatures"
+          WEBHOOK_SECRET: "spg-webhook-secret-hmac-2026"
         run: go test -v -race ./...

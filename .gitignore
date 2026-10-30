@@ -22,10 +22,19 @@ Thumbs.db
 .vscode/
 *.swp
 
-# PDF & PPT presentation guides (Local Interview Cheatsheets)
+# Frontend dependencies & build cache
+frontend/node_modules/
+*.tsbuildinfo
+
+# Local notes, documents & private scratchpads
+interview-prep/
+.interview/
+.notes/
+*cheatsheet*
+*CHEATSHEET*
+*interview*
+*INTERVIEW*
 *.pdf
 docs/*.pdf
 *.pptx
 *.ppt
-
-

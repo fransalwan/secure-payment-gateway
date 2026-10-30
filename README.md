@@ -1,295 +1,141 @@
-# Secure Payment Gateway (`secure-payment-gateway`)
+# Omni-Channel Mini E-Commerce OMS & Secure Payment Gateway
 
-> **Production-Grade, High-Performance Payment Processing & Double-Entry Ledger Engine**  
-> Built with Go, PostgreSQL, and Redis. Engineered with a zero-trust cybersecurity posture, high-throughput concurrency control, and an interactive web dashboard.
+> **Production-Grade B2B Merchant Order Management System (OMS), Anti-Overselling Inventory Engine & Zero-Trust Payment Gateway**  
+> Built with **Vue 3 + TypeScript + Pinia**, **Golang (Chi + pgx/v5)**, **PostgreSQL 16**, and **Redis 7**.
 
 [![Go Version](https://img.shields.io/badge/Go-1.22%2B-blue.svg)](https://golang.org)
+[![Frontend](https://img.shields.io/badge/Frontend-Vue%203%20%2B%20TypeScript%20%2B%20Pinia-42b883.svg)](https://vuejs.org/)
 [![CI Pipeline](https://github.com/fransalwan/secure-payment-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/fransalwan/secure-payment-gateway/actions/workflows/ci.yml)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%2016-blue.svg)](https://www.postgresql.org/)
-[![Cache & Lock](https://img.shields.io/badge/Cache%20%26%20Lock-Redis%207-red.svg)](https://redis.io/)
-[![Security](https://img.shields.io/badge/Security-AES--256--GCM%20%7C%20HMAC--SHA256-green.svg)](#cybersecurity-architecture)
-[![Dashboard UI](https://img.shields.io/badge/UI-Interactive%20Fintech%20Dashboard-emerald.svg)](#-interactive-fintech-dashboard--security-playground)
+[![Queue & Lock](https://img.shields.io/badge/Queue%20%26%20Lock-Redis%207-red.svg)](https://redis.io/)
+[![Security](https://img.shields.io/badge/Security-AES--256--GCM%20%7C%20HMAC--SHA256-green.svg)](#-security--idempotency-guarantees)
 
 ---
 
 ## 📌 Executive Summary
 
-Dalam industri perbankan dan fintech, integritas finansial dan kecepatan transaksi adalah dua hal yang tidak bisa ditawar. Kesalahan sekecil apa pun dapat menyebabkan kerugian finansial (*double-deduction*), kebocoran data sensitif (*identity leakage*), atau kebuntuan sistem (*database deadlock*).
-
-`secure-payment-gateway` adalah backend engine yang dirancang untuk memecahkan tantangan dunia nyata tersebut:
-1. **Zero-Trust Cybersecurity**: Enkripsi data sensitif di level aplikasi (AES-256-GCM), autentikasi request berbasis tanda tangan kriptografis (HMAC-SHA256), mitigasi Replay Attack, serta rantai audit tamper-evident.
-2. **Extreme Concurrency & Performance**: Arsitektur akuntansi berpasangan (*Double-Entry Bookkeeping*), algoritma pengurutan lock deterministik pencegah deadlock, dan *Distributed Idempotency Engine*.
-3. **Resilient Architecture**: Pola *Transactional Outbox Pattern* dengan `SKIP LOCKED` untuk pengiriman event asinkron tanpa *dual-write anomaly*.
-4. **Interactive Playground UI**: Web Dashboard siap demo untuk memvisualisasikan buku besar (*double-entry ledger*), audit chain, serta simulasi serangan siber secara interaktif langsung dari browser.
-
----
-
-## 🖥️ Interactive Fintech Dashboard & Security Playground
-
-Aplikasi dilengkapi dengan dashboard visual interaktif yang dapat diakses langsung di browser saat server berjalan:
-
-📍 **URL Dashboard**: `http://localhost:8080/` atau `http://localhost:8080/dashboard`
-
-### Fitur Unggulan Dashboard:
-* **Financial State Machine Lifecycle Tracker**: Visualisasi 5 tahap pemrosesan atomik secara real-time (`AUTH` &rarr; `DEDUP` &rarr; `ACID LOCK` &rarr; `LEDGER` &rarr; `AUDIT`).
-* **High-Concurrency Race Attack Simulator**: Uji ketahanan konkurensi dengan menembakkan **5 request paralel serentak di milidetik yang sama** via `Promise.all()` (1 mutasi berhasil `200 OK`, 4 duplikasi diblokir `409 Conflict`).
-* **Bilateral T-Account Ledger Visualizer**: Inspeksi buku besar akuntansi berpasangan (*T-Account flow*) membuktikan invariant $\sum \text{Debit} - \sum \text{Credit} = \text{IDR } 0.00$.
-* **Automated 3-Way Bank Reconciliation Engine**: Penyelarasan mutasi settlement bank eksternal vs ledger internal (`MATCHED`, `DISCREPANCY_AMOUNT`, `MISSING_IN_GATEWAY`) dengan fitur ekspor CSV 1-klik.
-* **Cryptographic Tamper Simulator**: Tombol simulasi manipulasi data database yang seketika memicu alarm pelanggaran integritas rantai SHA-256.
-* **Security & Attack Playground Controls**:
-  * **Simulasi MITM (Tamper Signature)**: Memanipulasi tanda tangan payload untuk mengamati penolakan otomatis oleh middleware keamanan (`401 Unauthorized`).
-  * **Simulasi Replay Attack**: Mengirimkan request dengan timestamp basi (> 5 menit) untuk menguji penolakan anti-replay.
-  * **Uji Idempotensi**: Menembak request berulang dengan key yang sama untuk memverifikasi pencegahan *double-deduct*.
-* **Field-Level AES-256-GCM Inspector**: Form pendaftaran rekening nasabah yang mengenkripsi data identitas (NIK / Card Number) ke bentuk ciphertext hex sebelum disimpan ke database.
-* **Presenter Mode & Keyboard Shortcuts**: Tekan tombol angka `1` s/d `6` pada keyboard untuk memicu skenario demo seketika saat presentasi.
+Platform B2B Merchant yang menyatukan pesanan dari **Web Checkout**, **Marketplace Webhook (Shopee / TikTok Shop)**, dan **Social Commerce Chat (WhatsApp / Live Selling via AI)**, dilengkapi:
+1. **AI Social Commerce Order Capture**: Ekstraksi chat WhatsApp/Live Selling tidak terstruktur menjadi draft order terpetakan ke SKU PostgreSQL (`< 3s` SLA + validasi stok real-time + *hybrid NLP fallback*).
+2. **Multi-Channel 3-State Inventory & Anti-Overselling Engine**: Penguncian baris deterministik PostgreSQL (`SELECT ... FOR UPDATE` + `WHERE available_stock >= $1`) dengan 3 status stok (`available_stock`, `reserved_stock`, `sold_stock`) yang menjamin **nol stok minus (*zero overselling*)** saat *flash sale*.
+3. **Secure Payment Gateway & Idempotent Webhook**: Verifikasi tanda tangan *constant-time* `HMAC-SHA256`, proteksi *replay attack* (`<= 5 menit`), deduplikasi atomik `UNIQUE(provider, external_event_id)` di `webhook_events` (`< 50ms` fast ACK), dan pembukuan akuntansi berpasangan (*Double-Entry Ledger*).
+4. **Asynchronous Redis Queue, Exponential Backoff & DLQ**: Pemrosesan *Logistics Waybill Generator* (`JNE`, `J&T`, `SiCepat`), sinkronisasi stok marketplace, dan notifikasi WA dengan *Exponential Backoff* (`2s, 4s, 8s, 16s`) serta *Dead-Letter Queue* (`system_error_logs`).
+5. **Vue 3 + TypeScript + Pinia Operational Dashboard**: 4 panel operasional lengkap dengan **Stress-Test Lab** (*10 Concurrent Buyers vs 1 Last Stock* & *5x Duplicate Payment Webhook*) serta cetak resi **Thermal A6 (`100x150mm`)**.
 
 ---
 
-## 🏗️ Arsitektur Sistem
+## 📚 Engineering & Developer Handover Documentation
+
+Repositori ini dilengkapi dokumentasi teknis terstruktur untuk mempermudah *onboarding* dan pengembangan lanjutan oleh *maintainer* berikutnya:
+
+| Dokumen | Fokus & Isi Utama |
+| :--- | :--- |
+| **[`docs/ARCHITECTURE_AND_HANDOVER.md`](docs/ARCHITECTURE_AND_HANDOVER.md)** | Peta modul (*codebase map*), 5 *System Invariants ("Do Not Break" Rules)*, diagram ER & sekuens, *playbooks* penambahan fitur baru, serta *troubleshooting runbook*. |
+| **[`docs/API_REFERENCE.md`](docs/API_REFERENCE.md)** | Spesifikasi kontrak REST API lengkap (request/response JSON, header keamanan HMAC, kode status HTTP `200`/`201`/`401`/`409`). |
+| **[`AI_WORKFLOW.md`](AI_WORKFLOW.md)** | Standar kerja *Spec-First AI Engineering*, dekomposisi task, *prompt template*, dan *Pre-Merge Review Checklist*. |
+
+---
+
+## 🏗️ Arsitektur Sistem End-to-End
 
 ```
-                      +-----------------------------+
-                      |   Merchant / Client / Web UI|
-                      +--------------+--------------+
-                                     |  (HTTPS + HMAC-SHA256 Signature)
-                                     v
-               +--------------------------------------------+
-               |        API Gateway / Chi HTTP Router       |
-               |  - Anti-Replay Timestamp Validator         |
-               |  - Constant-Time HMAC Signature Check      |
-               |  - Panic Recovery & Structured Logging     |
-               +---------------------+----------------------+
-                                     |
-                                     v
-               +--------------------------------------------+
-               |          Transfer & Ledger Service         |
-               |  - Idempotency State Machine (Lock/Cache)  |
-               |  - AES-256-GCM Field-Level Decryption      |
-               +----------+-----------------------+---------+
-                          |                       |
-        (Distributed Lock)|                       | (Async Batch)
-                          v                       v
-               +--------------------+   +-------------------+
-               |    Redis Store     |   |   Outbox Worker   |
-               | - Idempotency Lock |   | - Reliable Queue  |
-               | - Response Cache   |   | - Webhook Dispatch|
-               +--------------------+   +---------+---------+
-                          |                       |
-                          +-----------+-----------+
-                                      |
-                                      v
-               +--------------------------------------------+
-               |             PostgreSQL Engine              |
-               |  - Deterministic Row Locking (No Deadlock) |
-               |  - Double-Entry Ledger (DEBIT & CREDIT)    |
-               |  - Hash-Chained Tamper-Evident Audit Logs  |
-               +--------------------------------------------+
++-------------------------------------------------------------------------+
+|              FRONTEND: Vue 3 + TypeScript + Pinia + Tailwind            |
+|  [Unified Order Inbox] [3-State Stock] [Stress Lab] [Queue/DLQ Monitor] |
++-------------------+---------------------------------+-------------------+
+                    | REST API (JSON)                 | Simulasi Webhook
+                    v                                 v (HMAC-SHA256)
++-------------------------------------------------------------------------+
+|                      BACKEND: Golang (Chi Router)                       |
+|                                                                         |
+|  1. Order, Inventory & AI Service   2. Webhook & Core Payment Switch    |
+|     - Gemini JSON + NLP Fallback       - Verify Constant-Time HMAC      |
+|     - Deterministic Lock Ordering      - Atomic `webhook_events` Guard  |
+|     - PostgreSQL `FOR UPDATE` Tx       - Fast ACK (200 OK < 50ms)       |
++-------------------+---------------------------------+-------------------+
+                    |                                 | Enqueue Job
+       ACID Tx      v                                 v
++-----------------------------------+   +---------------------------------+
+|      DATABASE: PostgreSQL 16      |   |       QUEUE: Redis 7            |
+|  - merchants (Multi-Tenant)       |   |  - payment-webhook-queue        |
+|  - products (avail/reserved/sold) |   |  - logistics-waybill-queue      |
+|  - orders & order_items           |   |  - channel-stock-sync-queue     |
+|  - webhook_events (Idempotency)   |   |  - notification-queue           |
+|  - shipments (Waybill AWB)        |   +-----------------+---------------+
+|  - system_error_logs (DLQ Audit)  |                     | Retry Backoff
+|  - accounts & ledger_entries      |                     v (2s,4s,8s,16s)
++-----------------------------------+   +---------------------------------+
+                                        |     BACKGROUND QUEUE WORKER     |
+                                        |  - Settle Order -> PAID         |
+                                        |  - Generate Courier Waybill AWB |
+                                        |  - Sync Marketplace Stock       |
+                                        +---------------------------------+
 ```
 
 ---
 
-## 🛡️ Cybersecurity Highlights
+## 🛡️ Security & Idempotency Guarantees
 
-### 1. Constant-Time HMAC-SHA256 Request Verification
-Setiap transaksi transfer wajib membawa header:
-* `X-Signature`: Tanda tangan hex `HMAC-SHA256(timestamp + "." + body, secret_key)`
-* `X-Timestamp`: Unix timestamp saat request dibuat
-
-Sistem memverifikasi signature menggunakan algoritma **Constant-Time Comparison** (`hmac.Equal`) untuk menggagalkan **Timing Attacks** (peretas mengukur selisih waktu respons mikrodetik untuk menebak byte signature).
-
-### 2. Anti-Replay Attack Protection
-Request yang dicegat oleh pihak ketiga di jaringan publik tidak dapat dikirim ulang berulang kali. Header `X-Timestamp` dievaluasi terhadap clock server dengan batas toleransi maksimal $\pm 300$ detik (5 menit).
-
-### 3. Field-Level Authenticated Encryption (AES-256-GCM)
-Nomor identitas (NIK / Card Number) dienkripsi sebelum masuk ke database menggunakan **AES-256-GCM**. Nonce 12-byte digenerasi secara acak untuk setiap enkripsi, menghasilkan ciphertext unik bahkan untuk data identitas yang identik. Jika ada manipulasi langsung pada baris database, tag otentikasi GCM akan gagal mendekripsi.
-
-### 4. Tamper-Evident Hash-Chained Audit Logs
-Setiap mutasi saldo dicatat dalam tabel `audit_logs` yang bersifat append-only:
-$$\text{CurrentHash} = \text{SHA256}(\text{PreviousHash} + ":" + \text{Payload})$$
-Hal ini membentuk rantai kriptografis mirip struktur blockchain mini yang membuktikan catatan audit tidak pernah disisipkan atau diubah secara retrospektif.
+* **Constant-Time `HMAC-SHA256` Verification**: Endpoint `/api/v1/webhooks/payment` dan `/api/v1/transfers` memvalidasi hash menggunakan `hmac.Equal` untuk mencegah *timing side-channel attacks*, disertai jendela waktu `±300` detik anti-*replay attack*.
+* **Database-Level Webhook Idempotency**: Menggunakan `INSERT INTO webhook_events ... ON CONFLICT (provider, external_event_id) DO NOTHING RETURNING id` sehingga badai pengiriman ulang webhook identik langsung direspons `200 OK` (`{"status": "duplicate_ignored"}`) tanpa memotong stok dua kali.
+* **One-Way Order State Machine**: Transisi ketat satu arah (`PENDING_PAYMENT` &rarr; `PAID` &rarr; `READY_TO_SHIP` &rarr; `SHIPPED` &rarr; `COMPLETED` atau `PENDING_PAYMENT` &rarr; `CANCELLED`).
+* **Field-Level Encryption (`AES-256-GCM`) & Hash-Chained Audit Trail**: Data identitas akun dienkripsi secara autentik sebelum masuk ke PostgreSQL, dan setiap mutasi saldo diikat dalam rantai kriptografis `SHA-256`.
 
 ---
 
-## ⚡ Concurrency & Performance Engine
+## 📡 Daftar REST API Endpoints Utama
 
-### 1. Deterministic Lock Ordering (Eliminasi Deadlock)
-Dalam sistem transfer, skenario di mana Akun A mentransfer ke Akun B bersamaan dengan Akun B mentransfer ke Akun A dapat memicu **Database Deadlock** jika kedua transaksi mengunci baris dengan urutan terbalik:
-* Transaksi 1: Lock Akun A $\rightarrow$ menunggu Lock Akun B
-* Transaksi 2: Lock Akun B $\rightarrow$ menunggu Lock Akun A
-
-**Solusi yang diimplementasikan:**
-Sebelum menjalankan `SELECT FOR UPDATE`, ID kedua akun dibandingkan secara leksikografis:
-```go
-firstLockID := req.SourceAccountID
-secondLockID := req.DestinationAccountID
-if strings.Compare(firstLockID.String(), secondLockID.String()) > 0 {
-    firstLockID, secondLockID = secondLockID, firstLockID
-}
-// Selalu lock firstLockID terlebih dahulu, baru kemudian secondLockID
-```
-Hal ini menjamin seluruh proses di seluruh thread selalu meminta lock dalam urutan yang identik, secara matematis **mengeliminasi circular wait deadlock**.
-
-### 2. Distributed Idempotency State Machine
-Mencegah terjadinya saldo terpotong dua kali (*Double Deduction*):
-1. Request masuk dengan header `X-Idempotency-Key: <UUID>`.
-2. Melakukan atomic `SETNX` ke Redis dengan status `PROCESSING`.
-3. Jika request kedua datang saat status masih `PROCESSING`, tolak dengan `409 Conflict`.
-4. Saat transaksi berhasil di-commit di PostgreSQL, cache response disimpan di Redis. Request ulangan berikutnya langsung mengembalikan response tanpa menyentuh saldo database.
-
-### 3. Double-Entry Bookkeeping
-Uang tidak pernah diubah secara sembarangan. Setiap transaksi selalu menghasilkan dua baris entri di `ledger_entries`:
-* **DEBIT** pada rekening pengirim.
-* **CREDIT** pada rekening penerima.
-* Nilai mutasi selalu berimbang ($\sum \text{Debit} - \sum \text{Credit} = 0$).
-
----
-
-## 📡 Daftar REST API Endpoints
-
-| Method | Endpoint | Keterangan | Autentikasi / Header |
-|---|---|---|---|
-| `GET` | `/` atau `/dashboard` | Interactive Fintech Dashboard Web UI | Publik |
-| `GET` | `/health` | Health Check & Latency Probe | Publik |
-| `GET` | `/api/v1/accounts` | List semua rekening terdaftar | Publik |
-| `POST` | `/api/v1/accounts` | Buat rekening baru (Enkripsi AES-256-GCM) | Publik |
-| `GET` | `/api/v1/accounts/{id}` | Detail saldo & rekening | Publik |
-| `POST` | `/api/v1/transfers` | Eksekusi transfer saldo atomik berpasangan | `X-Signature`, `X-Timestamp`, `X-Idempotency-Key` |
-| `GET` | `/api/v1/ledger` | Riwayat mutasi Double-Entry Ledger | Publik |
-| `GET` | `/api/v1/audit-logs` | Rantai Audit Tamper-Evident SHA-256 | Publik |
-| `POST` | `/api/v1/reconciliation/upload` | Ingestion & Automated 3-Way Bank Reconciliation CSV | Publik (Multipart / CSV Stream) |
-| `GET` | `/api/v1/reconciliation/batches` | Daftar batch riwayat rekonsiliasi | Publik |
-| `GET` | `/api/v1/reconciliation/batches/{id}` | Laporan detail selisih & kecocokan batch | Publik |
-
----
-
-## 🗄️ Database Schema
-
-```sql
-accounts (
-    id UUID PRIMARY KEY,
-    account_number VARCHAR(32) UNIQUE,
-    holder_name VARCHAR(128),
-    encrypted_identity TEXT, -- AES-256-GCM
-    balance BIGINT NOT NULL CHECK (balance >= 0),
-    currency VARCHAR(3),
-    version INT
-)
-
-transactions (
-    id UUID PRIMARY KEY,
-    reference_id VARCHAR(64) UNIQUE,
-    idempotency_key VARCHAR(128) UNIQUE,
-    source_account_id UUID REFERENCES accounts(id),
-    destination_account_id UUID REFERENCES accounts(id),
-    amount BIGINT NOT NULL CHECK (amount > 0),
-    status VARCHAR(20) -- PENDING, SETTLED, FAILED
-)
-
-ledger_entries (
-    id UUID PRIMARY KEY,
-    transaction_id UUID REFERENCES transactions(id),
-    account_id UUID REFERENCES accounts(id),
-    entry_type VARCHAR(6), -- DEBIT / CREDIT
-    amount BIGINT NOT NULL,
-    balance_after BIGINT NOT NULL
-)
-
-audit_logs (
-    id BIGSERIAL PRIMARY KEY,
-    entity_type VARCHAR(50),
-    action VARCHAR(50),
-    payload JSONB,
-    previous_hash VARCHAR(64),
-    current_hash VARCHAR(64)
-)
-
-outbox_events (
-    id UUID PRIMARY KEY,
-    event_type VARCHAR(50),
-    payload JSONB,
-    status VARCHAR(20) -- PENDING, PROCESSED, FAILED
-)
-
-reconciliation_batches (
-    id UUID PRIMARY KEY,
-    batch_number VARCHAR(64) UNIQUE,
-    bank_name VARCHAR(64),
-    total_records INT,
-    matched_count INT,
-    discrepancy_count INT,
-    missing_in_gateway_count INT,
-    status VARCHAR(20) -- PROCESSING, COMPLETED, FAILED
-)
-
-reconciliation_items (
-    id UUID PRIMARY KEY,
-    batch_id UUID REFERENCES reconciliation_batches(id),
-    reference_id VARCHAR(64),
-    bank_amount BIGINT,
-    gateway_amount BIGINT,
-    difference_amount BIGINT,
-    match_status VARCHAR(30) -- MATCHED, DISCREPANCY_AMOUNT, MISSING_IN_GATEWAY
-)
-```
+| Method | Endpoint | Deskripsi & Logika Utama |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/dashboard/overview` | Mengambil state terpadu multi-merchant: daftar `orders`, stok 3-status `products`, `webhook_events`, metrik antrean Redis, dan `system_error_logs`. |
+| `POST` | `/api/v1/orders/ai-parse` | Mengekstrak teks chat WA/Live Selling menjadi draft JSON order terpetakan ke SKU katalog beserta peringatan stok kurang (`< 3s`). |
+| `POST` | `/api/v1/orders` | Membuat order baru dalam transaksi PostgreSQL (`SELECT ... FOR UPDATE`), memindahkan `available_stock` &rarr; `reserved_stock`, mengembalikan `201 Created` atau `409 Conflict`. |
+| `POST` | `/api/v1/orders/{id}/cancel` | Membatalkan order `PENDING_PAYMENT` dan mengembalikan `reserved_stock` &rarr; `available_stock` secara atomik. |
+| `POST` | `/api/v1/webhooks/payment` | Menerima webhook pembayaran (`X-Webhook-Id`, `X-Webhook-Timestamp`, `X-Webhook-Signature`), memvalidasi idempotency, mendorong job ke Redis Queue (`< 50ms`). |
+| `POST` | `/api/v1/simulator/race-condition` | Menjalankan simulasi `N` pembeli konkuren yang memperebutkan 1 stok terakhir secara simultan. |
+| `POST` | `/api/v1/simulator/duplicate-webhook` | Menembakkan 5 webhook identik beruntun untuk membuktikan deduplikasi idempotent. |
+| `POST` | `/api/v1/simulator/chaos-mode` | Mengatur simulasi kegagalan API logistik pihak ketiga (`OFF`, `TRANSIENT_TWICE`, `ALWAYS_429`) untuk menguji *Exponential Backoff* & DLQ. |
+| `POST` | `/api/v1/queue/jobs/{id}/retry` | Melakukan *Manual Retry* atas job yang berada di status `FAILED / DLQ`. |
+| `POST` | `/api/v1/transfers` | Transfer dana atomik *Double-Entry Ledger* berproteksi `HMAC-SHA256` & Redis Idempotency Lock. |
+| `POST` | `/api/v1/reconciliation/upload` | Pencocokan mutasi bank *3-Way Settlement Reconciliation* berbasis CSV stream. |
 
 ---
 
 ## 🚀 Panduan Menjalankan & Pengujian
 
 ### 1. Prasyarat
-* [Go 1.22+](https://golang.org)
-* [Docker & Docker Compose](https://www.docker.com/) (atau PostgreSQL & Redis lokal)
+* **Go 1.22+**
+* **Node.js 20+** (untuk kompilasi source Vue 3 + TypeScript di `frontend/`)
+* **PostgreSQL 16** & **Redis 7** (via Docker Compose atau instalasi lokal)
 
-### 2. Jalankan Database & Cache (Docker)
+### 2. Jalankan Database & Redis
 ```bash
 docker compose up -d
 ```
 
-### 3. Jalankan Automated Test Suite
+### 3. Build Frontend Vue 3 (Opsional — bundle produksi sudah tersedia di `web/dist`)
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+### 4. Jalankan Automated Critical Workflow & Race Detector Tests
 ```bash
 go test -v -race ./...
 ```
 
-### 4. Jalankan API Server
+### 5. Jalankan Server Aplikasi
 ```bash
 go run ./cmd/api
 ```
-Server akan aktif di `http://localhost:8080`. Buka browser untuk melihat dashboard interaktif.
+Akses **Operational Dashboard & Simulator UI** di `http://localhost:8080`.
 
-### 5. Jalankan Background Outbox Worker (Terminal Terpisah)
+### 6. Live Remote Demo via Public Tunnel
 ```bash
-go run ./cmd/worker
-```
-
-### 6. Live Remote Demo via Public Tunnel (Cloudflare / ngrok)
-Aplikasi ini sudah **100% Tunnel-Ready** (termasuk dukungan CORS dinamis untuk *preflight* `OPTIONS`, custom signature headers, dan relative endpoint routing):
-```bash
-# Jalankan tunnel otomatis (Zero-Config via Cloudflare Tunnel):
 make tunnel
 # Atau di PowerShell:
 .\scripts\tunnel.ps1
-
-# Atau paksa menggunakan ngrok:
-make tunnel-ngrok
 ```
-Perintah ini langsung menghasilkan URL publik bertaraf HTTPS (contoh: `https://xxxx.trycloudflare.com`) yang dapat diakses secara publik dari browser atau API client (Postman/curl) di perangkat mana pun tanpa perlu instalasi tambahan.
-
-
----
-
-## 📊 Benchmark & Performance Targets (k6)
-
-Jalankan script stress-testing:
-```bash
-k6 run scripts/k6_load_test.js
-```
-
-**Target SLO Performa:**
-* **Throughput**: $> 1.500$ TPS
-* **Latency p95**: $< 45$ ms
-* **Latency p99**: $< 90$ ms
-* **Zero Negative Balance Invariant**: Terbukti $0$ saldo negatif bahkan saat ribuan request konkuren bersaing pada satu akun.
-
 
 ---
 
@@ -299,5 +145,3 @@ k6 run scripts/k6_load_test.js
 * **Email**: [fransalwan55@gmail.com](mailto:fransalwan55@gmail.com)
 * **GitHub**: [github.com/fransalwan](https://github.com/fransalwan)
 * **Education**: Master of Computer Science in Artificial Intelligence @ Universitas Gadjah Mada (UGM)
-* **Focus**: High-Throughput Golang Backend, Financial Switches, Double-Entry Systems & Distributed Architecture
-

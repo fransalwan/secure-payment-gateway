@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS system_error_logs;
+DROP TABLE IF EXISTS shipments;
+DROP TABLE IF EXISTS webhook_events;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS merchants;
+

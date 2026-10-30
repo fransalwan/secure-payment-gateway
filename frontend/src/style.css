@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+}
+
+/* Native <dialog> scroll containment & backdrop (per modern-web-guidance: dialog & light-dismiss-a-dialog) */
+dialog:modal {
+  overscroll-behavior: contain;
+  margin: auto;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background-color: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(5px);
+}
+
+/* Layout isolation for high-frequency live dashboard panels (per interactions-in-complex-layouts) */
+.oms-panel {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px auto 480px;
+}
+
+@supports not (content-visibility: auto) {
+  .oms-panel {
+    contain: layout style paint;
+  }
+}
+
+/* Accessible & container-aware responsive data tables (per responsive-table) */
+.table-wrapper {
+  container-type: inline-size;
+  overflow-x: auto;
+}
+
+.table-wrapper thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+}
+
+/* Custom subtle scrollbars */
+.custom-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+}
+
+/* Thermal A6 Shipping Waybill Print Stylesheet */
+@media print {
+  @page {
+    size: 100mm 150mm;
+    margin: 0;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  #thermal-waybill-sheet,
+  #thermal-waybill-sheet * {
+    visibility: visible !important;
+  }
+  #thermal-waybill-sheet {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100mm !important;
+    min-height: 148mm !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 4mm !important;
+    margin: 0 !important;
+  }
+}
+
