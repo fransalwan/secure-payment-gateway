@@ -157,3 +157,4 @@ func (p *EventProducer) PublishPaymentProofVerify(ctx context.Context, payload *
 
 	return nil
 }
+

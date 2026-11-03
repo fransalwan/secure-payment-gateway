@@ -107,3 +107,4 @@ func (r *ReportingRepository) AuditAIQuery(
 	)
 	return err
 }
+

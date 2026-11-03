@@ -101,3 +101,4 @@ type AskAIReportResponseDTO struct {
 	SanitizedSafe bool                     `json:"sanitized_safe"`
 	TokensUsed    int                      `json:"tokens_used,omitempty"`
 }
+

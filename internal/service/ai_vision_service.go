@@ -255,3 +255,4 @@ func (s *AIVisionService) heuristicSlipParser(imageBytes []byte, expectedAmount 
 		Notes:           "Authentic bank transfer receipt matched successfully",
 	}
 }
+

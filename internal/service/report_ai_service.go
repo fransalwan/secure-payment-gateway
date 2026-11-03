@@ -371,3 +371,4 @@ func (s *ReportAIService) deterministicReportFallback(
 
 	return cleanSQL, explanation, chartType
 }
+

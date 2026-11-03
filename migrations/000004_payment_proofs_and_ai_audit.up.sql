@@ -46,3 +46,4 @@ CREATE TABLE IF NOT EXISTS ai_reporting_audit_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_reporting_audit_merchant_created ON ai_reporting_audit_logs (merchant_id, created_at DESC);
+
