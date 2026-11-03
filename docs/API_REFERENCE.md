@@ -285,3 +285,29 @@ Eksekusi query laporan analitik bisnis berbasis bahasa alami (Natural Language T
   }
 }
 ```
+
+---
+
+### `GET /api/v1/ai/telemetry`
+Mengambil metrik observabilitas AI, FinOps token usage, pHash duplicate detection, dan kesehatan Transactional Outbox.
+
+* **Response `200 OK`**:
+```json
+{
+  "code": 200,
+  "data": {
+    "total_calls": 48,
+    "vision_calls": 28,
+    "text_to_sql_calls": 20,
+    "total_tokens": 34500,
+    "total_cost_usd": 0.0078,
+    "avg_latency_ms": 285.4,
+    "fraud_quarantine_count": 4,
+    "fraud_rate_pct": 8.3,
+    "ast_blocks_count": 3,
+    "duplicate_phash_count": 2,
+    "outbox_pending_count": 0,
+    "outbox_processed_count": 48
+  }
+}
+```

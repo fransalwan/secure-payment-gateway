@@ -80,6 +80,7 @@ func main() {
 	omsRepo := postgresrepo.NewOMSRepository(pgPool)
 	proofRepo := postgresrepo.NewPaymentProofRepository(pgPool)
 	reportingRepo := postgresrepo.NewReportingRepository(pgPool)
+	outboxRepo := postgresrepo.NewOutboxRepository(pgPool)
 	idempotencyRepo := redisrepo.NewIdempotencyRepository(redisClient)
 	queueRepo := redisrepo.NewQueueRepository(redisClient)
 
@@ -89,6 +90,7 @@ func main() {
 		"migrations/000002_reconciliation_schema.up.sql",
 		"migrations/000003_oms_schema.up.sql",
 		"migrations/000004_payment_proofs_and_ai_audit.up.sql",
+		"migrations/000005_outbox_and_ai_telemetry.up.sql",
 	} {
 		if _, statErr := os.Stat(mig); statErr == nil {
 			if migErr := omsRepo.EnsureSchema(ctx, mig); migErr != nil {
@@ -104,12 +106,16 @@ func main() {
 	aiParserService := service.NewAIOrderParserService(omsRepo, cfg)
 	omsService := service.NewOMSService(omsRepo, queueRepo, aiParserService, cfg)
 	visionService := service.NewAIVisionService(cfg)
-	reportService := service.NewReportAIService(cfg, reportingRepo)
+	visionService.SetOutboxRepo(outboxRepo)
+	reportService := service.NewReportAIService(cfg, reportingRepo, outboxRepo)
 
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 	if cfg.EnableEmbeddedWorker {
 		go omsService.StartBackgroundWorker(workerCtx)
+
+		// Start Transactional Outbox Publisher Worker to eliminate Dual-Write Problem
+		rabbitmqrepo.StartOutboxPublisherWorker(workerCtx, outboxRepo, rabbitProducer, 1*time.Second)
 
 		// Start RabbitMQ Asynchronous Vision AI Payment Proof Worker
 		rabbitConsumer.StartPaymentProofWorker(workerCtx, func(pCtx context.Context, payload *domain.PaymentProofVerifyTaskPayload) error {
@@ -135,8 +141,9 @@ func main() {
 	transferHandler := httphandler.NewTransferHandler(transferService)
 	reconHandler := httphandler.NewReconciliationHandler(reconService)
 	omsHandler := httphandler.NewOMSHandler(omsService, aiParserService)
-	proofHandler := httphandler.NewPaymentProofHandler(proofRepo, rabbitProducer, omsRepo)
+	proofHandler := httphandler.NewPaymentProofHandler(proofRepo, rabbitProducer, omsRepo, outboxRepo)
 	reportHandler := httphandler.NewReportHandler(reportService)
+	telemetryHandler := httphandler.NewAITelemetryHandler(outboxRepo)
 
 	r := chi.NewRouter()
 
@@ -206,6 +213,10 @@ func main() {
 
 		// Enterprise Text-to-SQL Reporting Engine (Grounded Schema & AST Guardrails)
 		r.Post("/reports/ask-ai", reportHandler.AskAIReport)
+
+		// AI Observability, FinOps Telemetry & Outbox Health
+		r.Get("/ai/telemetry", telemetryHandler.GetTelemetrySummary)
+		r.Get("/telemetry", telemetryHandler.GetTelemetrySummary)
 
 		// Stress-Test & Queue Chaos Simulators
 		r.Post("/simulator/race-condition", omsHandler.SimulateRaceCondition)

@@ -51,10 +51,18 @@ func setupAIEnterpriseTestSuite(t *testing.T) (
 		t.Fatalf("failed to apply migration 000004 in test: %v", err)
 	}
 
+	mig5 := filepath.Join("..", "..", "migrations", "000005_outbox_and_ai_telemetry.up.sql")
+	if err := omsRepo.EnsureSchema(ctx, mig5); err != nil {
+		pgPool.Close()
+		t.Fatalf("failed to apply migration 000005 in test: %v", err)
+	}
+
 	proofRepo := postgresrepo.NewPaymentProofRepository(pgPool)
 	reportingRepo := postgresrepo.NewReportingRepository(pgPool)
+	outboxRepo := postgresrepo.NewOutboxRepository(pgPool)
 	visionService := service.NewAIVisionService(cfg)
-	reportService := service.NewReportAIService(cfg, reportingRepo)
+	visionService.SetOutboxRepo(outboxRepo)
+	reportService := service.NewReportAIService(cfg, reportingRepo, outboxRepo)
 
 	rabbitClient, _ := rabbitmqrepo.NewRabbitMQClient(cfg)
 
@@ -277,5 +285,117 @@ func TestRabbitMQ_ProducerConsumerPipeline(t *testing.T) {
 		// Message consumed successfully
 	case <-time.After(3 * time.Second):
 		t.Log("Note: In fallback mode or queue delayed, pipeline worker executed within SLA")
+	}
+}
+
+func TestTransactionalOutboxAndPHashDuplicateDetection(t *testing.T) {
+	omsRepo, proofRepo, _, _, _, _, pgPool := setupAIEnterpriseTestSuite(t)
+	outboxRepo := postgresrepo.NewOutboxRepository(pgPool)
+	ctx := context.Background()
+
+	merchants, err := omsRepo.ListMerchants(ctx)
+	if err != nil || len(merchants) == 0 {
+		t.Fatalf("no merchants available: %v", err)
+	}
+	merchantID := merchants[0].ID
+
+	products, err := omsRepo.ListProductsByMerchant(ctx, merchantID)
+	if err != nil || len(products) == 0 {
+		t.Fatalf("no products available: %v", err)
+	}
+
+	prod := products[0]
+	_, _ = omsRepo.SetAvailableStock(ctx, prod.ID, 50)
+
+	orderReq := &domain.CreateOrderRequestDTO{
+		MerchantID:      merchantID,
+		Channel:         domain.ChannelWeb,
+		CustomerName:    "Outbox Tester",
+		CustomerPhone:   "081299998888",
+		ShippingAddress: "Jl. Sudirman 100",
+		CourierCode:     "JNE",
+		Items: []domain.CreateOrderItemDTO{
+			{ProductID: prod.ID, Qty: 1},
+		},
+	}
+
+	ord, err := omsRepo.CreateOrderAtomic(ctx, orderReq, fmt.Sprintf("OUTBOX-%s", uuid.New().String()[:8]), "http://pay.test", time.Now().Add(1*time.Hour))
+	if err != nil {
+		t.Fatalf("failed to create order for outbox test: %v", err)
+	}
+
+	// 1. Test Transactional Outbox write
+	proofID := uuid.New()
+	pHashA := "a1b2c3d4e5f60718"
+	proof := &domain.PaymentProof{
+		ID:         proofID,
+		OrderID:    ord.ID,
+		MerchantID: merchantID,
+		FileName:   "slip_a.jpg",
+		ImagePHash: pHashA,
+		Status:     domain.ProofStatusPending,
+	}
+
+	taskPayload := map[string]interface{}{
+		"proof_id": proofID.String(),
+		"order_id": ord.ID.String(),
+		"amount":   ord.TotalAmount,
+	}
+
+	outboxEvent, err := proofRepo.CreatePaymentProofWithOutbox(ctx, proof, outboxRepo, taskPayload)
+	if err != nil {
+		t.Fatalf("CreatePaymentProofWithOutbox failed: %v", err)
+	}
+	if outboxEvent.Status != domain.OutboxStatusPending {
+		t.Errorf("expected outbox status PENDING, got %s", outboxEvent.Status)
+	}
+
+	// Verify pending outbox events fetch
+	pendingEvents, err := outboxRepo.FetchPendingOutboxEvents(ctx, 10)
+	if err != nil {
+		t.Fatalf("FetchPendingOutboxEvents failed: %v", err)
+	}
+	if len(pendingEvents) == 0 {
+		t.Errorf("expected at least 1 pending outbox event")
+	}
+
+	// Mark outbox processed
+	_ = outboxRepo.MarkOutboxProcessed(ctx, outboxEvent.ID)
+
+	// 2. Test Near-Duplicate pHash detection
+	// Slip B has Hamming distance 1 (near duplicate)
+	pHashB := "a1b2c3d4e5f60719" // last bit flipped
+	dupProof, distance, err := proofRepo.FindNearDuplicatePHash(ctx, merchantID, pHashB, 5)
+	if err != nil {
+		t.Fatalf("FindNearDuplicatePHash error: %v", err)
+	}
+	if dupProof == nil {
+		t.Fatalf("expected near duplicate proof to be detected")
+	}
+	if distance > 5 {
+		t.Errorf("expected hamming distance <= 5, got %d", distance)
+	}
+
+	// 3. Test AI Telemetry recording & summary
+	err = outboxRepo.RecordAITelemetry(ctx, domain.AITelemetryEvent{
+		ServiceType:      "VISION_SLIP",
+		ModelName:        "gemini-1.5-flash-vision",
+		PromptTokens:     350,
+		CompletionTokens: 120,
+		LatencyMs:        230,
+		CostUSD:          0.000164,
+		IsSuccess:        true,
+		FraudFlag:        false,
+	})
+	if err != nil {
+		t.Fatalf("RecordAITelemetry failed: %v", err)
+	}
+
+	summary, err := outboxRepo.GetAITelemetrySummary(ctx)
+	if err != nil {
+		t.Fatalf("GetAITelemetrySummary failed: %v", err)
+	}
+	if summary.TotalCalls <= 0 {
+		t.Errorf("expected summary.TotalCalls > 0, got %d", summary.TotalCalls)
 	}
 }

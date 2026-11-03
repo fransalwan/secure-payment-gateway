@@ -36,6 +36,7 @@ type PaymentProofVerifyTaskPayload struct {
 	MerchantID      uuid.UUID `json:"merchant_id"`
 	ImageBase64     string    `json:"image_base64,omitempty"`
 	ImageMimeType   string    `json:"image_mime_type,omitempty"`
+	ImagePHash      string    `json:"image_phash,omitempty"`
 	FileName        string    `json:"file_name"`
 	ExpectedAmount  float64   `json:"expected_amount"`
 	Attempt         int       `json:"attempt"`
@@ -54,21 +55,23 @@ const (
 
 // PaymentProof Entity
 type PaymentProof struct {
-	ID              uuid.UUID          `json:"id"`
-	OrderID         uuid.UUID          `json:"order_id"`
-	MerchantID      uuid.UUID          `json:"merchant_id"`
-	FileName        string             `json:"file_name"`
-	BankName        string             `json:"bank_name"`
-	SenderName      string             `json:"sender_name"`
-	Amount          float64            `json:"amount"`
-	ReferenceNumber string             `json:"reference_number"`
-	TransferTime    *time.Time         `json:"transfer_time,omitempty"`
-	TamperDetected  bool               `json:"tamper_detected"`
-	ConfidenceScore float64            `json:"confidence_score"`
-	Status          PaymentProofStatus `json:"status"`
-	RejectionReason string             `json:"rejection_reason,omitempty"`
-	CreatedAt       time.Time          `json:"created_at"`
-	ProcessedAt     *time.Time         `json:"processed_at,omitempty"`
+	ID               uuid.UUID          `json:"id"`
+	OrderID          uuid.UUID          `json:"order_id"`
+	MerchantID       uuid.UUID          `json:"merchant_id"`
+	FileName         string             `json:"file_name"`
+	BankName         string             `json:"bank_name"`
+	SenderName       string             `json:"sender_name"`
+	Amount           float64            `json:"amount"`
+	ReferenceNumber  string             `json:"reference_number"`
+	TransferTime     *time.Time         `json:"transfer_time,omitempty"`
+	TamperDetected   bool               `json:"tamper_detected"`
+	ConfidenceScore  float64            `json:"confidence_score"`
+	Status           PaymentProofStatus `json:"status"`
+	RejectionReason  string             `json:"rejection_reason,omitempty"`
+	ImagePHash       string             `json:"image_phash,omitempty"`
+	IsDuplicateImage bool               `json:"is_duplicate_image"`
+	CreatedAt        time.Time          `json:"created_at"`
+	ProcessedAt      *time.Time         `json:"processed_at,omitempty"`
 }
 
 // VisionSlipExtractionResult from multimodal LLM

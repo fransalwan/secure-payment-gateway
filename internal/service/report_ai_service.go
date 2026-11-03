@@ -21,22 +21,36 @@ import (
 type ReportAIService struct {
 	cfg          *config.Config
 	reportRepo   *postgresrepo.ReportingRepository
+	outboxRepo   *postgresrepo.OutboxRepository
 	httpClient   *http.Client
 	schemaPrompt string
 }
 
-func NewReportAIService(cfg *config.Config, reportRepo *postgresrepo.ReportingRepository) *ReportAIService {
+func NewReportAIService(
+	cfg *config.Config,
+	reportRepo *postgresrepo.ReportingRepository,
+	outboxRepo *postgresrepo.OutboxRepository,
+) *ReportAIService {
 	schema := `Database Schema (PostgreSQL 16):
 - merchants (id UUID, code VARCHAR, name VARCHAR, city VARCHAR, phone VARCHAR)
 - products (id UUID, merchant_id UUID, sku VARCHAR, name VARCHAR, price NUMERIC, available_stock INT, reserved_stock INT, sold_stock INT)
 - orders (id UUID, merchant_id UUID, order_number VARCHAR, channel VARCHAR['WEB','WHATSAPP_LIVE','SHOPEE','TIKTOK_SHOP'], customer_name VARCHAR, status VARCHAR['PENDING_PAYMENT','PAID','READY_TO_SHIP','SHIPPED','COMPLETED','CANCELLED','SUSPICIOUS_HOLD'], total_amount NUMERIC, waybill_number VARCHAR, paid_at TIMESTAMPTZ, created_at TIMESTAMPTZ)
 - order_items (id UUID, order_id UUID, product_id UUID, sku VARCHAR, product_name VARCHAR, qty INT, unit_price NUMERIC, subtotal NUMERIC)
 - webhook_events (id UUID, provider VARCHAR, event_type VARCHAR, status VARCHAR, processing_ms INT, created_at TIMESTAMPTZ)
-- payment_proofs (id UUID, order_id UUID, merchant_id UUID, bank_name VARCHAR, sender_name VARCHAR, amount NUMERIC, status VARCHAR['PENDING','VERIFIED','SUSPICIOUS_HOLD','REJECTED'], tamper_detected BOOLEAN, confidence_score NUMERIC, created_at TIMESTAMPTZ)`
+- payment_proofs (id UUID, order_id UUID, merchant_id UUID, bank_name VARCHAR, sender_name VARCHAR, amount NUMERIC, status VARCHAR['PENDING','VERIFIED','SUSPICIOUS_HOLD','REJECTED'], tamper_detected BOOLEAN, confidence_score NUMERIC, image_phash VARCHAR, is_duplicate_image BOOLEAN, created_at TIMESTAMPTZ)
+
+Enterprise Semantic Metric Definitions:
+1. GMV (Gross Merchandise Value): COALESCE(SUM(total_amount), 0) FROM orders WHERE status IN ('PAID', 'READY_TO_SHIP', 'SHIPPED', 'COMPLETED')
+2. Net Realized Revenue: COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'COMPLETED'
+3. Pending Receivables: COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'PENDING_PAYMENT'
+4. Fraud Quarantine Volume: COUNT(*) FROM orders WHERE status = 'SUSPICIOUS_HOLD'
+5. Top Performing Products: Grouped by product_name, SUM(qty) AS total_sold, SUM(subtotal) AS gmv FROM order_items
+6. Channel Distribution: Count and total GMV grouped by channel ('WEB', 'SHOPEE', 'TIKTOK_SHOP', 'WHATSAPP_LIVE')`
 
 	return &ReportAIService{
 		cfg:          cfg,
 		reportRepo:   reportRepo,
+		outboxRepo:   outboxRepo,
 		schemaPrompt: schema,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
@@ -98,6 +112,23 @@ func (s *ReportAIService) AskAIReport(
 
 	execMs := time.Since(start).Milliseconds()
 	_ = s.reportRepo.AuditAIQuery(ctx, req.MerchantID, cleanQuestion, generatedSQL, true, execMs, len(rows), tokensUsed)
+
+	if s.outboxRepo != nil {
+		toks := tokensUsed
+		if toks == 0 {
+			toks = 350
+		}
+		_ = s.outboxRepo.RecordAITelemetry(ctx, domain.AITelemetryEvent{
+			ServiceType:      "TEXT_TO_SQL",
+			ModelName:        "gemini-1.5-flash",
+			PromptTokens:     toks * 2 / 3,
+			CompletionTokens: toks / 3,
+			LatencyMs:        int(execMs),
+			CostUSD:          float64(toks) * 0.00000035,
+			IsSuccess:        true,
+			FraudFlag:        false,
+		})
+	}
 
 	log.Info().
 		Str("question", cleanQuestion).

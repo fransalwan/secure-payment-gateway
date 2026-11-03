@@ -21,7 +21,7 @@ import {
   ArrowRight,
 } from '@lucide/vue'
 
-export type NavSection = 'orders' | 'inventory' | 'lab' | 'queues' | 'ledger' | 'reports'
+export type NavSection = 'orders' | 'inventory' | 'lab' | 'queues' | 'ledger' | 'reports' | 'telemetry'
 
 defineProps<{
   open: boolean
@@ -87,6 +87,19 @@ const actions = computed<ActionItem[]>(() => [
     run: () => {
       emit('update:open', false)
       emit('navigate', 'reports')
+    },
+  },
+  {
+    id: 'sim-finops-telemetry',
+    group: 'Simulasi Live & AI',
+    title: '4. AI FinOps Observability & Outbox Pipeline Cockpit',
+    subtitle: 'Pantau token consumption, estimasi biaya USD, latensi, dan status outbox',
+    badge: 'FinOps',
+    badgeVariant: 'emerald',
+    icon: Sparkles,
+    run: () => {
+      emit('update:open', false)
+      emit('navigate', 'telemetry')
     },
   },
   {

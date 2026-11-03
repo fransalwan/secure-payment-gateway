@@ -123,6 +123,21 @@ export interface QueueMetrics {
   recent_jobs: QueueJob[]
 }
 
+export interface AITelemetrySummary {
+  total_calls: number
+  vision_calls: number
+  text_to_sql_calls: number
+  total_tokens: number
+  total_cost_usd: number
+  avg_latency_ms: number
+  fraud_quarantine_count: number
+  fraud_rate_pct: number
+  ast_blocks_count: number
+  duplicate_phash_count: number
+  outbox_pending_count: number
+  outbox_processed_count: number
+}
+
 export interface SystemErrorLog {
   id: string
   service_name: string

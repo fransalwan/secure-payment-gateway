@@ -15,6 +15,7 @@ import (
 
 	"github.com/fransalwan/secure-payment-gateway/internal/config"
 	"github.com/fransalwan/secure-payment-gateway/internal/domain"
+	postgresrepo "github.com/fransalwan/secure-payment-gateway/internal/repository/postgres"
 	"github.com/rs/zerolog/log"
 )
 
@@ -25,6 +26,7 @@ type VisionService interface {
 type AIVisionService struct {
 	cfg        *config.Config
 	httpClient *http.Client
+	outboxRepo *postgresrepo.OutboxRepository
 }
 
 func NewAIVisionService(cfg *config.Config) *AIVisionService {
@@ -34,6 +36,10 @@ func NewAIVisionService(cfg *config.Config) *AIVisionService {
 			Timeout: 10 * time.Second,
 		},
 	}
+}
+
+func (s *AIVisionService) SetOutboxRepo(repo *postgresrepo.OutboxRepository) {
+	s.outboxRepo = repo
 }
 
 func (s *AIVisionService) AnalyzeBankSlip(
@@ -72,6 +78,21 @@ func (s *AIVisionService) AnalyzeBankSlip(
 	}
 
 	elapsed := time.Since(start).Milliseconds()
+
+	if s.outboxRepo != nil {
+		toks := 420
+		_ = s.outboxRepo.RecordAITelemetry(ctx, domain.AITelemetryEvent{
+			ServiceType:      "VISION_SLIP",
+			ModelName:        "gemini-1.5-flash-vision",
+			PromptTokens:     320,
+			CompletionTokens: 100,
+			LatencyMs:        int(elapsed),
+			CostUSD:          float64(toks) * 0.00000035,
+			IsSuccess:        true,
+			FraudFlag:        result.TamperDetected,
+		})
+	}
+
 	log.Info().
 		Str("engine", engineUsed).
 		Str("bank", result.BankName).

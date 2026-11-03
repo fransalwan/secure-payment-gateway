@@ -17,6 +17,7 @@ import CommandPaletteModal, { type NavSection } from './components/CommandPalett
 import OrderInspectorSheet from './components/OrderInspectorSheet.vue'
 import PaymentSlipModal from './components/PaymentSlipModal.vue'
 import AiReportingPanel from './components/AiReportingPanel.vue'
+import AiTelemetryPanel from './components/AiTelemetryPanel.vue'
 import type { Order } from './types/oms'
 import {
   LayoutGrid,
@@ -33,9 +34,11 @@ import {
   ShieldCheck,
   Store,
   UploadCloud,
+  Coins,
+  Camera,
 } from '@lucide/vue'
 
-type WorkspaceView = 'overview' | NavSection
+type WorkspaceView = 'overview' | NavSection | 'telemetry'
 
 const store = useOmsStore()
 const { resolvedTheme, toggleOppositeScheme } = useThemeScheme()
@@ -59,6 +62,7 @@ const headingIdByView: Record<WorkspaceView, string> = {
   queues: 'queue-monitor-heading',
   ledger: 'core-ledger-heading',
   reports: 'ai-reporting-heading',
+  telemetry: 'ai-telemetry-heading',
 }
 
 const navItems = computed(() => [
@@ -87,6 +91,22 @@ const navItems = computed(() => [
     badgeVariant: 'amber' as const,
   },
   {
+    id: 'reports' as WorkspaceView,
+    label: 'AI SQL Analytics',
+    shortLabel: 'Reports',
+    icon: Sparkles,
+    badge: 'Text2SQL',
+    badgeVariant: 'indigo' as const,
+  },
+  {
+    id: 'telemetry' as WorkspaceView,
+    label: 'FinOps & Observability',
+    shortLabel: 'FinOps',
+    icon: Coins,
+    badge: 'Live',
+    badgeVariant: 'emerald' as const,
+  },
+  {
     id: 'lab' as WorkspaceView,
     label: 'Concurrency Lab',
     shortLabel: 'Lab',
@@ -96,7 +116,7 @@ const navItems = computed(() => [
   },
   {
     id: 'queues' as WorkspaceView,
-    label: 'Redis Queue & DLQ',
+    label: 'Broker Queue & DLQ',
     shortLabel: 'Queues',
     icon: Activity,
     badge:
@@ -111,14 +131,6 @@ const navItems = computed(() => [
     shortLabel: 'Ledger',
     icon: Landmark,
     badge: null,
-    badgeVariant: 'indigo' as const,
-  },
-  {
-    id: 'reports' as WorkspaceView,
-    label: 'AI SQL Analytics',
-    shortLabel: 'Reports',
-    icon: Sparkles,
-    badge: 'Text2SQL',
     badgeVariant: 'indigo' as const,
   },
 ])
@@ -192,15 +204,15 @@ onUnmounted(() => {
     <aside class="hidden lg:flex w-64 shrink-0 flex-col border-r border-border bg-sidebar sticky top-0 h-dvh">
       <!-- Brand Header -->
       <div class="p-4 border-b border-border flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs shadow-sm shadow-emerald-600/25 shrink-0">
-          OMS
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-600 text-white flex items-center justify-center font-black text-xs shadow-sm shadow-indigo-600/25 shrink-0">
+          AI
         </div>
         <div class="min-w-0">
           <div class="text-sm font-extrabold tracking-tight text-foreground truncate">
-            Omni-Channel OMS
+            FinTech OMS &amp; Switch
           </div>
           <div class="text-[11px] text-muted-foreground truncate">
-            Payment Switch &amp; Stock Engine
+            AI &amp; Zero-Trust Settlement
           </div>
         </div>
       </div>
@@ -387,6 +399,80 @@ onUnmounted(() => {
 
       <!-- Main Workspace Container (Extra bottom padding on mobile for fixed Bottom Tab Bar) -->
       <main class="flex-1 w-full max-w-7xl mx-auto px-3.5 sm:px-6 py-4 sm:py-6 pb-24 lg:pb-8 space-y-5">
+        <!-- RECRUITER & TECH LEAD QUICK LAUNCHER BAR -->
+        <div class="p-4 rounded-2xl border border-indigo-500/25 bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-background shadow-xs">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">
+                Recruiter &amp; Tech Lead Guided Sandbox (1-Click Demos)
+              </span>
+            </div>
+            <span class="text-[11px] text-muted-foreground font-medium">Target: Software Engineer (AI) / FinTech Backend</span>
+          </div>
+
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+            <button
+              type="button"
+              @click="slipModalRef?.openModal()"
+              class="group p-2.5 rounded-xl border border-border/80 bg-card hover:border-indigo-500/60 hover:bg-indigo-500/10 transition text-left flex items-start gap-2.5 cursor-pointer"
+            >
+              <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                <Camera class="w-4 h-4" />
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-foreground truncate">1. Vision AI Slip</div>
+                <div class="text-[10px] text-muted-foreground truncate">Tamper &amp; pHash Duplicate</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              @click="switchView('reports')"
+              class="group p-2.5 rounded-xl border border-border/80 bg-card hover:border-purple-500/60 hover:bg-purple-500/10 transition text-left flex items-start gap-2.5 cursor-pointer"
+            >
+              <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                <Sparkles class="w-4 h-4" />
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-foreground truncate">2. Text-to-SQL BI</div>
+                <div class="text-[10px] text-muted-foreground truncate">Semantic Metrics &amp; AST Safe</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              @click="switchView('lab')"
+              class="group p-2.5 rounded-xl border border-border/80 bg-card hover:border-amber-500/60 hover:bg-amber-500/10 transition text-left flex items-start gap-2.5 cursor-pointer"
+            >
+              <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                <Zap class="w-4 h-4" />
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-foreground truncate">3. Concurrency Lab</div>
+                <div class="text-[10px] text-muted-foreground truncate">10 Buyers vs 1 Stock</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              @click="switchView('telemetry')"
+              class="group p-2.5 rounded-xl border border-border/80 bg-card hover:border-emerald-500/60 hover:bg-emerald-500/10 transition text-left flex items-start gap-2.5 cursor-pointer"
+            >
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                <Coins class="w-4 h-4" />
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-foreground truncate">4. AI FinOps Cockpit</div>
+                <div class="text-[10px] text-muted-foreground truncate">Tokens, Cost &amp; Outbox</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
         <!-- Bento KPI Summary Strip (2x2 on Mobile -> 4 Columns on Desktop) -->
         <div v-if="activeView !== 'ledger'" class="grid grid-cols-2 lg:grid-cols-4 gap-3 tabular-nums">
           <div class="p-3.5 sm:p-4 rounded-2xl bg-card border border-border shadow-2xs">
@@ -476,6 +562,8 @@ onUnmounted(() => {
         <CorePaymentLedgerView v-else-if="activeView === 'ledger'" />
 
         <AiReportingPanel v-else-if="activeView === 'reports'" />
+
+        <AiTelemetryPanel v-else-if="activeView === 'telemetry'" />
       </main>
     </div>
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fransalwan/secure-payment-gateway/internal/domain"
+	"github.com/fransalwan/secure-payment-gateway/pkg/crypto"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,17 +38,122 @@ func (r *PaymentProofRepository) CreatePaymentProof(ctx context.Context, proof *
 		INSERT INTO payment_proofs (
 			id, order_id, merchant_id, file_name, image_data,
 			bank_name, sender_name, amount, reference_number,
-			tamper_detected, confidence_score, status, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+			tamper_detected, confidence_score, status, image_phash, is_duplicate_image, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	`,
 		proof.ID, proof.OrderID, proof.MerchantID, proof.FileName, "",
 		proof.BankName, proof.SenderName, proof.Amount, proof.ReferenceNumber,
-		proof.TamperDetected, proof.ConfidenceScore, proof.Status, proof.CreatedAt,
+		proof.TamperDetected, proof.ConfidenceScore, proof.Status,
+		proof.ImagePHash, proof.IsDuplicateImage, proof.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert payment proof: %w", err)
 	}
 	return nil
+}
+
+// CreatePaymentProofWithOutbox inserts a payment proof AND its outbox event inside a single ACID transaction.
+// This completely resolves the Dual-Write Problem between PostgreSQL and the RabbitMQ broker.
+func (r *PaymentProofRepository) CreatePaymentProofWithOutbox(
+	ctx context.Context,
+	proof *domain.PaymentProof,
+	outboxRepo *OutboxRepository,
+	payload interface{},
+) (*domain.OutboxEvent, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin outbox tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if proof.ID == uuid.Nil {
+		proof.ID = uuid.New()
+	}
+	if proof.CreatedAt.IsZero() {
+		proof.CreatedAt = time.Now().UTC()
+	}
+	if proof.Status == "" {
+		proof.Status = domain.ProofStatusPending
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO payment_proofs (
+			id, order_id, merchant_id, file_name, image_data,
+			bank_name, sender_name, amount, reference_number,
+			tamper_detected, confidence_score, status, image_phash, is_duplicate_image, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+	`,
+		proof.ID, proof.OrderID, proof.MerchantID, proof.FileName, "",
+		proof.BankName, proof.SenderName, proof.Amount, proof.ReferenceNumber,
+		proof.TamperDetected, proof.ConfidenceScore, proof.Status,
+		proof.ImagePHash, proof.IsDuplicateImage, proof.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("insert payment proof tx: %w", err)
+	}
+
+	var outboxEvent *domain.OutboxEvent
+	if outboxRepo != nil {
+		outboxEvent, err = outboxRepo.InsertOutboxEventTx(
+			ctx,
+			tx,
+			"PAYMENT_PROOF",
+			proof.ID.String(),
+			domain.RabbitMQRoutingPaymentVerify,
+			payload,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("insert outbox event tx: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit outbox tx: %w", err)
+	}
+
+	return outboxEvent, nil
+}
+
+// FindNearDuplicatePHash checks recent payment proofs to see if another slip has Hamming distance <= maxDistance.
+func (r *PaymentProofRepository) FindNearDuplicatePHash(
+	ctx context.Context,
+	merchantID uuid.UUID,
+	targetPHash string,
+	maxDistance int,
+) (*domain.PaymentProof, int, error) {
+	if targetPHash == "" {
+		return nil, -1, nil
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, order_id, merchant_id, file_name, bank_name, sender_name,
+		       amount::FLOAT8, reference_number, status, image_phash, created_at
+		FROM payment_proofs
+		WHERE merchant_id = $1 AND image_phash IS NOT NULL AND status IN ('VERIFIED', 'SUSPICIOUS_HOLD', 'PENDING')
+		ORDER BY created_at DESC
+		LIMIT 100
+	`, merchantID)
+	if err != nil {
+		return nil, -1, fmt.Errorf("query phashes: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var p domain.PaymentProof
+		if err := rows.Scan(
+			&p.ID, &p.OrderID, &p.MerchantID, &p.FileName, &p.BankName, &p.SenderName,
+			&p.Amount, &p.ReferenceNumber, &p.Status, &p.ImagePHash, &p.CreatedAt,
+		); err != nil {
+			return nil, -1, err
+		}
+
+		dist := crypto.HammingDistanceHex(targetPHash, p.ImagePHash)
+		if dist >= 0 && dist <= maxDistance {
+			return &p, dist, nil
+		}
+	}
+
+	return nil, -1, nil
 }
 
 func (r *PaymentProofRepository) GetPaymentProof(ctx context.Context, id uuid.UUID) (*domain.PaymentProof, error) {
@@ -60,6 +166,7 @@ func (r *PaymentProofRepository) GetPaymentProof(ctx context.Context, id uuid.UU
 		SELECT id, order_id, merchant_id, file_name, bank_name, sender_name,
 		       amount::FLOAT8, reference_number, transfer_time, tamper_detected,
 		       confidence_score::FLOAT8, status, rejection_reason, raw_vision_response,
+		       COALESCE(image_phash, ''), COALESCE(is_duplicate_image, FALSE),
 		       created_at, processed_at
 		FROM payment_proofs
 		WHERE id = $1
@@ -67,6 +174,7 @@ func (r *PaymentProofRepository) GetPaymentProof(ctx context.Context, id uuid.UU
 		&p.ID, &p.OrderID, &p.MerchantID, &p.FileName, &p.BankName, &p.SenderName,
 		&p.Amount, &p.ReferenceNumber, &transferTime, &p.TamperDetected,
 		&p.ConfidenceScore, &p.Status, &p.RejectionReason, &rawVision,
+		&p.ImagePHash, &p.IsDuplicateImage,
 		&p.CreatedAt, &processedAt,
 	)
 	if err != nil {
@@ -88,7 +196,9 @@ func (r *PaymentProofRepository) ListPaymentProofs(ctx context.Context, merchant
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, order_id, merchant_id, file_name, bank_name, sender_name,
 		       amount::FLOAT8, reference_number, transfer_time, tamper_detected,
-		       confidence_score::FLOAT8, status, rejection_reason, created_at, processed_at
+		       confidence_score::FLOAT8, status, rejection_reason,
+		       COALESCE(image_phash, ''), COALESCE(is_duplicate_image, FALSE),
+		       created_at, processed_at
 		FROM payment_proofs
 		WHERE merchant_id = $1
 		ORDER BY created_at DESC
@@ -107,7 +217,9 @@ func (r *PaymentProofRepository) ListPaymentProofs(ctx context.Context, merchant
 		if err := rows.Scan(
 			&p.ID, &p.OrderID, &p.MerchantID, &p.FileName, &p.BankName, &p.SenderName,
 			&p.Amount, &p.ReferenceNumber, &transferTime, &p.TamperDetected,
-			&p.ConfidenceScore, &p.Status, &p.RejectionReason, &p.CreatedAt, &processedAt,
+			&p.ConfidenceScore, &p.Status, &p.RejectionReason,
+			&p.ImagePHash, &p.IsDuplicateImage,
+			&p.CreatedAt, &processedAt,
 		); err != nil {
 			return nil, err
 		}

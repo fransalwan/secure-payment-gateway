@@ -113,12 +113,12 @@ func processOutboxBatch(ctx context.Context, repo *postgresrepo.OutboxRepository
 
 	for _, ev := range events {
 		log.Info().
-			Str("event_id", ev.ID.String()).
+			Str("event_id", ev.ID).
 			Str("event_type", ev.EventType).
 			Msg("Dispatching outbox event")
 
 		if err := repo.MarkProcessed(ctx, ev.ID); err != nil {
-			log.Error().Err(err).Str("event_id", ev.ID.String()).Msg("Failed to mark outbox event as processed")
+			log.Error().Err(err).Str("event_id", ev.ID).Msg("Failed to mark outbox event as processed")
 		}
 	}
 }

@@ -76,7 +76,7 @@ function setFile(file: File) {
 }
 
 // 1-Click Simulation Presets for Live Interview Demo
-function applyPreset(type: 'authentic' | 'tampered' | 'mismatch') {
+function applyPreset(type: 'authentic' | 'tampered' | 'mismatch' | 'duplicate') {
   const currentOrder = store.orders.find((o) => o.id === selectedOrderID.value)
   const targetAmount = currentOrder ? currentOrder.total_amount : 378000
 
@@ -89,6 +89,9 @@ function applyPreset(type: 'authentic' | 'tampered' | 'mismatch') {
   } else if (type === 'tampered') {
     content = `SIMULATE_TAMPER fake_photoshop_receipt font_glitch Rp ${targetAmount}`
     filename = 'photoshop_slip_tampered.jpg'
+  } else if (type === 'duplicate') {
+    content = `DUPLICATE_RECEIPT_PHASH_SIMULATION_PAYLOAD_REF_9999`
+    filename = 'reused_duplicate_slip.jpg'
   } else {
     content = `SIMULATE_AMOUNT_MISMATCH Rp 50.000 underpaid_slip`
     filename = 'underpaid_transfer_slip.jpg'
@@ -218,14 +221,14 @@ defineExpose({
           </span>
           <span class="text-[11px] text-indigo-700 dark:text-indigo-400">Pilih skenario uji</span>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <button
             type="button"
             class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition flex items-center justify-center gap-1.5 shadow-sm"
             @click="applyPreset('authentic')"
           >
             <ShieldCheck class="w-3.5 h-3.5" />
-            1. Struk Asli (Match)
+            1. Asli (Match)
           </button>
           <button
             type="button"
@@ -233,7 +236,7 @@ defineExpose({
             @click="applyPreset('tampered')"
           >
             <ShieldAlert class="w-3.5 h-3.5" />
-            2. Struk Editan (Tamper)
+            2. Editan (Tamper)
           </button>
           <button
             type="button"
@@ -241,7 +244,15 @@ defineExpose({
             @click="applyPreset('mismatch')"
           >
             <AlertTriangle class="w-3.5 h-3.5" />
-            3. Kurang Bayar (Mismatch)
+            3. Kurang Bayar
+          </button>
+          <button
+            type="button"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-purple-600 text-white hover:bg-purple-700 transition flex items-center justify-center gap-1.5 shadow-sm"
+            @click="applyPreset('duplicate')"
+          >
+            <RefreshCw class="w-3.5 h-3.5" />
+            4. Duplikat (pHash)
           </button>
         </div>
       </div>
