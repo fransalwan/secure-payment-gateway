@@ -15,6 +15,8 @@ import WaybillPrintModal from './components/WaybillPrintModal.vue'
 import CorePaymentLedgerView from './components/CorePaymentLedgerView.vue'
 import CommandPaletteModal, { type NavSection } from './components/CommandPaletteModal.vue'
 import OrderInspectorSheet from './components/OrderInspectorSheet.vue'
+import PaymentSlipModal from './components/PaymentSlipModal.vue'
+import AiReportingPanel from './components/AiReportingPanel.vue'
 import type { Order } from './types/oms'
 import {
   LayoutGrid,
@@ -30,6 +32,7 @@ import {
   Moon,
   ShieldCheck,
   Store,
+  UploadCloud,
 } from '@lucide/vue'
 
 type WorkspaceView = 'overview' | NavSection
@@ -44,6 +47,7 @@ const isInspectorOpen = ref(false)
 
 const aiModalRef = ref<InstanceType<typeof AiOrderParserModal> | null>(null)
 const waybillModalRef = ref<InstanceType<typeof WaybillPrintModal> | null>(null)
+const slipModalRef = ref<InstanceType<typeof PaymentSlipModal> | null>(null)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -54,6 +58,7 @@ const headingIdByView: Record<WorkspaceView, string> = {
   lab: 'stress-lab-heading',
   queues: 'queue-monitor-heading',
   ledger: 'core-ledger-heading',
+  reports: 'ai-reporting-heading',
 }
 
 const navItems = computed(() => [
@@ -108,6 +113,14 @@ const navItems = computed(() => [
     badge: null,
     badgeVariant: 'indigo' as const,
   },
+  {
+    id: 'reports' as WorkspaceView,
+    label: 'AI SQL Analytics',
+    shortLabel: 'Reports',
+    icon: Sparkles,
+    badge: 'Text2SQL',
+    badgeVariant: 'indigo' as const,
+  },
 ])
 
 const activeViewTitle = computed(
@@ -133,6 +146,11 @@ function openWaybillModal(order: Order) {
 function openOrderInspector(order: Order) {
   inspectedOrder.value = order
   isInspectorOpen.value = true
+}
+
+function onVerifySlipFromInspector(order: Order) {
+  isInspectorOpen.value = false
+  slipModalRef.value?.openModal(order.id)
 }
 
 function onMerchantSwitch(merchantId: string) {
@@ -354,6 +372,11 @@ onUnmounted(() => {
               <RefreshCw class="w-3.5 h-3.5" :class="store.isLoading ? 'animate-spin' : ''" />
             </Button>
 
+            <Button variant="outline" size="sm" class="hidden sm:inline-flex text-xs font-semibold" @click="slipModalRef?.openModal()">
+              <UploadCloud class="w-3.5 h-3.5 mr-1 text-tone-emerald" />
+              <span>Slip AI</span>
+            </Button>
+
             <Button variant="emerald" size="sm" class="hidden sm:inline-flex" @click="openAiModal">
               <Sparkles class="w-3.5 h-3.5" />
               <span>+ AI Order</span>
@@ -451,6 +474,8 @@ onUnmounted(() => {
         <QueueMonitorPanel v-else-if="activeView === 'queues'" />
 
         <CorePaymentLedgerView v-else-if="activeView === 'ledger'" />
+
+        <AiReportingPanel v-else-if="activeView === 'reports'" />
       </main>
     </div>
 
@@ -492,15 +517,18 @@ onUnmounted(() => {
     <!-- Adaptive Modals & Drawers (Desktop Dialog / Sheet -> Mobile Swipeable Vaul Drawer) -->
     <AiOrderParserModal ref="aiModalRef" />
     <WaybillPrintModal ref="waybillModalRef" />
+    <PaymentSlipModal ref="slipModalRef" />
     <CommandPaletteModal
       v-model:open="isCommandOpen"
       @navigate="(sec) => switchView(sec)"
       @open-ai-parser="openAiModal"
+      @open-slip-validator="slipModalRef?.openModal()"
     />
     <OrderInspectorSheet
       v-model:open="isInspectorOpen"
       :order="inspectedOrder"
       @print-waybill="openWaybillModal"
+      @verify-slip="onVerifySlipFromInspector"
     />
   </div>
 </template>

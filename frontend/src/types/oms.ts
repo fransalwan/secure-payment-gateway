@@ -5,6 +5,7 @@ export type OrderStatus =
   | 'SHIPPED'
   | 'COMPLETED'
   | 'CANCELLED'
+  | 'SUSPICIOUS_HOLD'
 
 export type OrderChannel = 'WEB' | 'WHATSAPP_LIVE' | 'SHOPEE' | 'TIKTOK_SHOP'
 

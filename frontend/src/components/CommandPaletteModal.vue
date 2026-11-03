@@ -21,7 +21,7 @@ import {
   ArrowRight,
 } from '@lucide/vue'
 
-export type NavSection = 'orders' | 'inventory' | 'lab' | 'queues' | 'ledger'
+export type NavSection = 'orders' | 'inventory' | 'lab' | 'queues' | 'ledger' | 'reports'
 
 defineProps<{
   open: boolean
@@ -31,6 +31,7 @@ const emit = defineEmits<{
   (e: 'update:open', val: boolean): void
   (e: 'navigate', section: NavSection): void
   (e: 'openAiParser'): void
+  (e: 'openSlipValidator'): void
 }>()
 
 const store = useOmsStore()
@@ -63,9 +64,35 @@ const actions = computed<ActionItem[]>(() => [
     },
   },
   {
+    id: 'sim-slip-vision',
+    group: 'Simulasi Live & AI',
+    title: '2. Multimodal Vision AI Bank Slip Validator',
+    subtitle: 'Upload & verifikasi struk transfer asinkron via RabbitMQ + deteksi manipulasi',
+    badge: 'Vision AI',
+    badgeVariant: 'indigo',
+    icon: Sparkles,
+    run: () => {
+      emit('update:open', false)
+      emit('openSlipValidator')
+    },
+  },
+  {
+    id: 'sim-sql-ai',
+    group: 'Simulasi Live & AI',
+    title: '3. Enterprise Text-to-SQL Analytics Reporting',
+    subtitle: 'Analisis omset, channel, dan stok via query bahasa alami aman (Read-Only)',
+    badge: 'Text-to-SQL',
+    badgeVariant: 'sky',
+    icon: Sparkles,
+    run: () => {
+      emit('update:open', false)
+      emit('navigate', 'reports')
+    },
+  },
+  {
     id: 'sim-race',
     group: 'Simulasi Live & AI',
-    title: '2. Simulate 10 Concurrent Buyers vs 1 Last Stock',
+    title: '4. Simulate 10 Concurrent Buyers vs 1 Last Stock',
     subtitle: 'Uji PostgreSQL SELECT FOR UPDATE anti-overselling lintas kanal',
     badge: 'Race Lock',
     badgeVariant: 'amber',
@@ -160,6 +187,17 @@ const actions = computed<ActionItem[]>(() => [
     run: () => {
       emit('update:open', false)
       emit('navigate', 'ledger')
+    },
+  },
+  {
+    id: 'nav-reports',
+    group: 'Navigasi Modul',
+    title: 'Enterprise AI Reporting & Text-to-SQL Console',
+    subtitle: 'Laporan finansial & operasional otomatis berbasis bahasa alami',
+    icon: Sparkles,
+    run: () => {
+      emit('update:open', false)
+      emit('navigate', 'reports')
     },
   },
 ])

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,13 +16,17 @@ import (
 	"github.com/fransalwan/secure-payment-gateway/internal/config"
 	httphandler "github.com/fransalwan/secure-payment-gateway/internal/handler/http"
 	custommiddleware "github.com/fransalwan/secure-payment-gateway/internal/handler/http/middleware"
+	pkglogger "github.com/fransalwan/secure-payment-gateway/internal/pkg/logger"
 	postgresrepo "github.com/fransalwan/secure-payment-gateway/internal/repository/postgres"
+	rabbitmqrepo "github.com/fransalwan/secure-payment-gateway/internal/repository/rabbitmq"
 	redisrepo "github.com/fransalwan/secure-payment-gateway/internal/repository/redis"
+	"github.com/fransalwan/secure-payment-gateway/internal/domain"
 	"github.com/fransalwan/secure-payment-gateway/internal/service"
 	"github.com/fransalwan/secure-payment-gateway/pkg/response"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
@@ -38,12 +43,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize Enterprise Structured Logging (Zerolog)
+	pkglogger.InitLogger(cfg.AppEnv)
+	log.Info().
+		Str("app_env", cfg.AppEnv).
+		Str("port", cfg.AppPort).
+		Msg("Enterprise AI-Powered FinTech OMS & Payment Gateway starting...")
+
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	pgPool, err := postgresrepo.NewConnectionPool(ctx, cfg)
 	if err != nil {
-		slog.Error("Failed to connect to PostgreSQL", "error", err)
+		log.Error().Err(err).Msg("Failed to connect to PostgreSQL")
 		os.Exit(1)
 	}
 	defer pgPool.Close()
@@ -53,11 +65,21 @@ func main() {
 		defer redisClient.Close()
 	}
 
+	// RabbitMQ Message Broker (Asynchronous AI Worker Pipeline)
+	rabbitClient, _ := rabbitmqrepo.NewRabbitMQClient(cfg)
+	if rabbitClient != nil {
+		defer rabbitClient.Close()
+	}
+	rabbitProducer := rabbitmqrepo.NewProducer(rabbitClient)
+	rabbitConsumer := rabbitmqrepo.NewConsumer(rabbitClient, 10)
+
 	// Repositories
 	accountRepo := postgresrepo.NewAccountRepository(pgPool)
 	transferRepo := postgresrepo.NewTransferRepository(pgPool)
 	reconRepo := postgresrepo.NewReconciliationRepository(pgPool)
 	omsRepo := postgresrepo.NewOMSRepository(pgPool)
+	proofRepo := postgresrepo.NewPaymentProofRepository(pgPool)
+	reportingRepo := postgresrepo.NewReportingRepository(pgPool)
 	idempotencyRepo := redisrepo.NewIdempotencyRepository(redisClient)
 	queueRepo := redisrepo.NewQueueRepository(redisClient)
 
@@ -66,10 +88,11 @@ func main() {
 		"migrations/000001_init_schema.up.sql",
 		"migrations/000002_reconciliation_schema.up.sql",
 		"migrations/000003_oms_schema.up.sql",
+		"migrations/000004_payment_proofs_and_ai_audit.up.sql",
 	} {
 		if _, statErr := os.Stat(mig); statErr == nil {
 			if migErr := omsRepo.EnsureSchema(ctx, mig); migErr != nil {
-				slog.Warn("Migration bootstrap warning", "file", mig, "error", migErr)
+				log.Warn().Str("file", mig).Err(migErr).Msg("Migration bootstrap warning")
 			}
 		}
 	}
@@ -80,11 +103,31 @@ func main() {
 	reconService := service.NewReconciliationService(reconRepo, transferRepo)
 	aiParserService := service.NewAIOrderParserService(omsRepo, cfg)
 	omsService := service.NewOMSService(omsRepo, queueRepo, aiParserService, cfg)
+	visionService := service.NewAIVisionService(cfg)
+	reportService := service.NewReportAIService(cfg, reportingRepo)
 
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 	if cfg.EnableEmbeddedWorker {
 		go omsService.StartBackgroundWorker(workerCtx)
+
+		// Start RabbitMQ Asynchronous Vision AI Payment Proof Worker
+		rabbitConsumer.StartPaymentProofWorker(workerCtx, func(pCtx context.Context, payload *domain.PaymentProofVerifyTaskPayload) error {
+			imgBytes, _ := base64.StdEncoding.DecodeString(payload.ImageBase64)
+			res, err := visionService.AnalyzeBankSlip(pCtx, imgBytes, payload.ImageMimeType, payload.ExpectedAmount)
+			if err != nil {
+				return err
+			}
+			newStatus, err := proofRepo.VerifyPaymentSlipAndTransitionOrderAtomic(pCtx, payload.ProofID, payload.OrderID, res)
+			if err != nil {
+				return err
+			}
+			if newStatus == domain.OrderStatusPaid {
+				ord, _ := omsRepo.GetOrderByID(pCtx, payload.OrderID)
+				omsService.FanOutPostPaymentJobs(pCtx, ord)
+			}
+			return nil
+		})
 	}
 
 	// HTTP Handlers
@@ -92,6 +135,8 @@ func main() {
 	transferHandler := httphandler.NewTransferHandler(transferService)
 	reconHandler := httphandler.NewReconciliationHandler(reconService)
 	omsHandler := httphandler.NewOMSHandler(omsService, aiParserService)
+	proofHandler := httphandler.NewPaymentProofHandler(proofRepo, rabbitProducer, omsRepo)
+	reportHandler := httphandler.NewReportHandler(reportService)
 
 	r := chi.NewRouter()
 
@@ -151,6 +196,14 @@ func main() {
 
 		// Idempotent & HMAC-SHA256 Verified Payment Webhook
 		r.Post("/webhooks/payment", omsHandler.ReceivePaymentWebhook)
+
+		// Multimodal Vision AI Bank Slip Verification (Async RabbitMQ Pipeline)
+		r.Post("/payments/proof", proofHandler.UploadProof)
+		r.Get("/payments/proofs", proofHandler.ListProofs)
+		r.Get("/payments/proofs/{id}", proofHandler.GetProof)
+
+		// Enterprise Text-to-SQL Reporting Engine (Grounded Schema & AST Guardrails)
+		r.Post("/reports/ask-ai", reportHandler.AskAIReport)
 
 		// Stress-Test & Queue Chaos Simulators
 		r.Post("/simulator/race-condition", omsHandler.SimulateRaceCondition)

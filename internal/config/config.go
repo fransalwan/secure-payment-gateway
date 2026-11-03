@@ -31,6 +31,14 @@ type Config struct {
 	RedisPassword string
 	RedisDB       int
 
+	// RabbitMQ Message Broker
+	RabbitMQURL      string
+	RabbitMQHost     string
+	RabbitMQPort     string
+	RabbitMQUser     string
+	RabbitMQPassword string
+	RabbitMQVHost    string
+
 	// Security
 	AESSecretKey              []byte
 	HMACSecretKey             []byte
@@ -55,6 +63,23 @@ func (c *Config) GetDSN() string {
 		Host:     net.JoinHostPort(c.DBHost, c.DBPort),
 		Path:     c.DBName,
 		RawQuery: "sslmode=" + url.QueryEscape(c.DBSSLMode),
+	}
+	return u.String()
+}
+
+func (c *Config) GetRabbitMQURL() string {
+	if c.RabbitMQURL != "" {
+		return c.RabbitMQURL
+	}
+	vhost := c.RabbitMQVHost
+	if vhost == "" {
+		vhost = "/"
+	}
+	u := &url.URL{
+		Scheme: "amqp",
+		User:   url.UserPassword(c.RabbitMQUser, c.RabbitMQPassword),
+		Host:   net.JoinHostPort(c.RabbitMQHost, c.RabbitMQPort),
+		Path:   vhost,
 	}
 	return u.String()
 }
@@ -99,6 +124,12 @@ func LoadConfig() (*Config, error) {
 		RedisAddr:                 getEnv("REDIS_ADDR", "localhost:6379"),
 		RedisPassword:             getEnv("REDIS_PASSWORD", ""),
 		RedisDB:                   redisDB,
+		RabbitMQURL:               getEnv("RABBITMQ_URL", ""),
+		RabbitMQHost:              getEnv("RABBITMQ_HOST", "localhost"),
+		RabbitMQPort:              getEnv("RABBITMQ_PORT", "5672"),
+		RabbitMQUser:              getEnv("RABBITMQ_USER", "guest"),
+		RabbitMQPassword:          getEnv("RABBITMQ_PASSWORD", "guest"),
+		RabbitMQVHost:             getEnv("RABBITMQ_VHOST", "/"),
 		AESSecretKey:              []byte(aesKey),
 		HMACSecretKey:             []byte(hmacKey),
 		HMACTimestampTolerance:    timestampTolerance,

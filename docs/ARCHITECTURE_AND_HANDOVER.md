@@ -7,45 +7,74 @@
 
 ## 1. Gambaran Umum & Bounded Contexts
 
-Sistem ini menggabungkan dua *bounded context* utama dalam satu *monolith modular* berbahasa **Go (`chi/v5`, `pgx/v5`, `go-redis/v9`)** dengan antarmuka operasional **Vue 3 + TypeScript + Pinia**:
+Sistem ini menggabungkan tiga *bounded context* utama dalam satu *monolith modular* berbasis event-driven berbahasa **Go (`chi/v5`, `pgx/v5`, `amqp091-go`, `go-redis/v9`, `rs/zerolog`)** dengan antarmuka operasional **Vue 3 + TypeScript + Pinia**:
 
 1. **Bounded Context A — Omni-Channel E-Commerce OMS (`oms_*`)**
    * Menangani *order capture* lintas kanal (`WEB`, `SHOPEE`, `TIKTOK_SHOP`, `WHATSAPP_LIVE`), ekstraksi chat sosial berbasis AI, manajemen inventori 3-status anti-*overselling*, penerima webhook pembayaran idempotent, serta *background worker* pencetakan nomor resi (*waybill*) dan sinkronisasi stok.
 2. **Bounded Context B — Core Payment Switch & Financial Ledger (`account_*`, `transfer_*`, `reconciliation_*`)**
    * Menangani brankas akun dengan enkripsi identitas *field-level* (`AES-256-GCM`), transfer dana atomik berpasangan (*Double-Entry Bookkeeping*), rantai audit kriptografis (`SHA-256 Hash Chain`), *Transactional Outbox*, dan rekonsiliasi mutasi bank 3-arah (*3-Way CSV Reconciliation*).
+3. **Bounded Context C — AI Multimodal Slip Verification & Text-to-SQL Reporting (`payment_proofs`, `ai_reporting_*`)**
+   * Menangani validasi bukti transfer bank via **RabbitMQ** dan **Gemini 1.5 Flash Vision AI** dengan deteksi manipulasi gambar (*tamper check*), transisi pesanan ACID atomik ke `PAID` atau `SUSPICIOUS_HOLD`, serta antarmuka laporan analitik bisnis berbasis bahasa alami dengan *AST SQL Token Sanitizer* dan read-only transaction guardrail.
 
 ```mermaid
 flowchart TB
     subgraph Client["Frontend Layer (Vue 3 + TypeScript + Pinia)"]
         UI_OMS["4-Panel Operational OMS UI"]
         UI_LEDGER["Core Payment Switch & Recon UI"]
+        UI_SLIP["Vision AI Slip Verification Modal"]
+        UI_BI["Natural Language Ask-AI Reporting Console"]
     end
 
     subgraph HTTP["Transport Layer (cmd/api & internal/handler/http)"]
-        MW["CORS + RequestID + Panic Recovery + HMAC Auth"]
-        H_OMS["OMSHandler (Orders, AI Parse, Webhooks, Simulators)"]
+        MW["CORS + RequestID + Zerolog Trace + HMAC Auth"]
+        H_OMS["OMSHandler (Orders, Webhooks, Simulators)"]
         H_PAY["Account / Transfer / Reconciliation Handlers"]
+        H_PROOF["PaymentProofHandler (POST /proof 202 Fast ACK)"]
+        H_REPORT["ReportHandler (POST /reports/ask-ai)"]
     end
 
-    subgraph Domain["Service Layer (internal/service)"]
+    subgraph Broker["Message Broker & Asynchronous Pipeline (RabbitMQ 3.13)"]
+        EX_OMS["Topic Exchange: oms.events"]
+        Q_PARSE["Queue: order.parse.queue"]
+        Q_VERIFY["Queue: payment.verify.proof"]
+        EX_DLX["DLX: oms.dlx -> Queue: oms.dlq"]
+    end
+
+    subgraph Domain["Service Layer & Worker Pool (internal/service)"]
         S_AI["AIOrderParserService (Gemini JSON + NLP Fallback)"]
         S_OMS["OMSService (Stock Lock, Webhook Dedup, Queue Worker)"]
         S_TX["TransferService & ReconciliationService"]
+        S_VISION["AIVisionService (Gemini Multimodal Vision + Tamper Check)"]
+        S_BI["ReportAIService (Gemini Text-to-SQL + AST Sanitizer)"]
     end
 
-    subgraph Infra["Persistence & Messaging Layer (internal/repository)"]
+    subgraph Infra["Persistence Layer (PostgreSQL 16)"]
         PG[("PostgreSQL 16 (pgxpool)")]
-        RD[("Redis 7 + Thread-Safe In-Memory Fallback")]
+        RD[("Redis 7 (Distributed Lock & Retry)")]
     end
 
     UI_OMS --> MW
     UI_LEDGER --> MW
+    UI_SLIP --> MW
+    UI_BI --> MW
     MW --> H_OMS
     MW --> H_PAY
-    H_OMS --> S_AI
+    MW --> H_PROOF
+    MW --> H_REPORT
+
+    H_PROOF -->|Publish payment.verify| EX_OMS
+    H_OMS -->|Publish order.parse| EX_OMS
+    EX_OMS --> Q_PARSE
+    EX_OMS --> Q_VERIFY
+    Q_PARSE --> S_AI
+    Q_VERIFY --> S_VISION
+    S_VISION -->|Failure > 3x| EX_DLX
+
+    H_REPORT --> S_BI
+    S_BI -->|Read-Only Tx 2500ms| PG
+    S_VISION -->|ACID SELECT FOR UPDATE| PG
     H_OMS --> S_OMS
     H_PAY --> S_TX
-    S_AI --> PG
     S_OMS --> PG
     S_OMS --> RD
     S_TX --> PG
@@ -58,17 +87,18 @@ flowchart TB
 
 | Path | Tanggung Jawab Utama | Catatan untuk Maintainer |
 | :--- | :--- | :--- |
-| `cmd/api/main.go` | Entrypoint HTTP server, bootstrap skema SQL idempotent, static file serving `web/dist`, dan *embedded queue worker*. | Mendukung *graceful shutdown* (`SIGTERM`/`SIGINT`) untuk menghentikan HTTP listener dan worker goroutine secara bersih. |
-| `cmd/worker/main.go` | Standalone daemon worker untuk *Transactional Outbox* dan *OMS Redis Queue*. | Gunakan di produksi ketika ingin memisahkan scaling proses API dari proses *background worker* (`ENABLE_EMBEDDED_WORKER=false` pada API). |
-| `internal/config/config.go` | Pembacaan konfigurasi environment (`.env`) dan validasi panjang kunci kriptografi. | `AES_SECRET_KEY` **wajib tepat 32 byte**. Server akan menolak start jika panjangnya tidak valid. |
-| `internal/domain/` | Definisi entitas bisnis murni, konstanta *state machine*, dan DTO JSON. | Bebas dari ketergantungan driver database maupun framework HTTP. |
-| `internal/repository/postgres/` | Seluruh query SQL menggunakan `pgx/v5`, transaksi ACID, dan *row-level locking*. | Semua operasi tulis multi-tabel **wajib** dibungkus `pool.BeginTx(ctx, pgx.TxOptions{})` dengan `defer tx.Rollback(ctx)`. |
-| `internal/repository/redis/` | `idempotency_repo.go` (distributed lock transfer) & `queue_repo.go` (antrean job asinkron + ZSET delayed retry). | Dirancang *dual-mode*: otomatis memakai Redis saat tersedia, dan jatuh ke *in-memory mutex store* jika Redis tidak terjangkau. |
-| `internal/service/` | Orkestrasi aturan bisnis, verifikasi webhook, parser AI, simulator konkurensi, dan *integration tests*. | Lihat `critical_workflows_test.go` sebagai spesifikasi hidup (*living specification*) untuk aturan bisnis kritis. |
+| `cmd/api/main.go` | Entrypoint HTTP server, bootstrap skema SQL idempotent, static file serving `web/dist`, RabbitMQ setup, dan *embedded queue worker*. | Mendukung *graceful shutdown* (`SIGTERM`/`SIGINT`) untuk menghentikan HTTP listener, RabbitMQ channel, dan worker goroutine secara bersih. |
+| `cmd/worker/main.go` | Standalone daemon worker untuk *RabbitMQ AI Workers*, *Transactional Outbox*, dan *OMS Redis Queue*. | Gunakan di produksi ketika ingin memisahkan scaling proses API dari proses *background worker* (`ENABLE_EMBEDDED_WORKER=false` pada API). |
+| `internal/config/config.go` | Pembacaan konfigurasi environment (`.env`) untuk PostgreSQL, Redis, RabbitMQ, dan validasi panjang kunci kriptografi. | `AES_SECRET_KEY` **wajib tepat 32 byte**. Server akan menolak start jika panjangnya tidak valid. |
+| `internal/pkg/logger/` | Structured logger enterprise berbasis `github.com/rs/zerolog`. | Mendukung format JSON di production dan Pretty Console di local dev, dengan injeksi RequestID/TraceID ke context. |
+| `internal/domain/` | Definisi entitas bisnis murni (`oms.go`, `ai_event.go`, `account.go`), konstanta *state machine*, dan DTO JSON. | Bebas dari ketergantungan driver database maupun framework HTTP. |
+| `internal/repository/rabbitmq/` | Client AMQP 0-9-1, deklarasi exchange/queue/DLX, Producer (`PublishOrderParse`, `PublishPaymentProofVerify`), dan Consumer Pool ber-QoS prefetch (10) & Exponential Backoff. | Dilengkapi *in-memory channel fallback* untuk memastikan tes integrasi tetap berjalan mulus meskipun broker offline. |
+| `internal/repository/postgres/` | Seluruh query SQL menggunakan `pgx/v5`, transaksi ACID, dan *row-level locking* (`payment_proof_repo.go`, `reporting_repo.go`, `oms_repo.go`). | Semua operasi tulis multi-tabel **wajib** dibungkus `pool.BeginTx(ctx, pgx.TxOptions{})` dengan `defer tx.Rollback(ctx)`. |
+| `internal/service/` | Orkestrasi aturan bisnis, verifikasi slip Multimodal AI (`ai_vision_service.go`), Text-to-SQL Reporting (`report_ai_service.go`), simulator konkurensi, dan *integration tests*. | Lihat `ai_enterprise_workflows_test.go` dan `critical_workflows_test.go` sebagai spesifikasi hidup (*living specification*). |
+| `internal/handler/http/` | HTTP handlers Chi: `payment_proof_handler.go` (Fast ACK `202 Accepted`), `report_handler.go` (Text-to-SQL BI), `oms_handler.go`. | Validasi payload, enkapsulasi status code, fast ACK, dan pendelegasian ke service layer. |
 | `pkg/crypto/` | Primitif keamanan: `AES-256-GCM`, `HMAC-SHA256` (*constant-time*), dan `SHA-256` *hash chain*. | Jangan pernah mengganti `hmac.Equal` dengan operator `==` biasa untuk menghindari *timing side-channel attack*. |
-| `pkg/reconciliation/` | Streaming CSV parser untuk pencocokan mutasi penyelesaian bank. | Memproses baris secara bertahap agar konsumsi memori tetap rendah pada file besar. |
-| `migrations/` | Skrip DDL PostgreSQL berurutan (`000001` s/d `000003`) beserta skrip *rollback* (`.down.sql`). | File `.up.sql` wajib ditulis idempotent (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`) agar aman dijalankan ulang saat *startup*. |
-| `frontend/` | Source code aplikasi SPA **Vue 3 + TypeScript + Pinia + Tailwind CSS v4 + `shadcn-vue` (`Reka UI` & `Vaul` Mobile Drawer)**. | Hasil build (`npm run build`) dikompilasi langsung ke `../web/dist` untuk disajikan oleh Go binary. |
+| `migrations/` | Skrip DDL PostgreSQL berurutan (`000001` s/d `000004`) beserta skrip *rollback* (`.down.sql`). | Migrasi `000004` menambahkan tabel `payment_proofs`, `ai_reporting_audit_logs`, serta status `SUSPICIOUS_HOLD`. |
+| `frontend/` | Source code aplikasi SPA **Vue 3 + TypeScript + Pinia + Tailwind CSS v4 + `shadcn-vue` (`Reka UI` & `Vaul` Mobile Drawer)**. | Dilengkapi `PaymentSlipModal.vue` dan `AiReportingPanel.vue`. Hasil build (`npm run build`) dikompilasi ke `web/dist`. |
 
 ---
 
@@ -110,6 +140,17 @@ Endpoint penerima webhook **dilarang** memanggil API pihak ketiga secara sinkron
 ### Rule 5: Graceful Fallback untuk Ketergantungan Eksternal
 * Jika `GEMINI_API_KEY` kosong atau API LLM mengalami *timeout* (`> 2.5s`), `AIOrderParserService` wajib jatuh otomatis ke parser deterministik (`parseDeterministicIndonesianChat`) tanpa menggagalkan alur kerja kasir/merchant.
 * Jika `redisClient == nil`, `QueueRepository` dan `IdempotencyRepository` wajib tetap beroperasi menggunakan penyimpanan *in-memory* berpelindung `sync.Mutex`.
+* Jika RabbitMQ broker offline, `RabbitMQClient` wajib jatuh otomatis ke saluran buffer *in-memory* Go channel agar testing dan fallback lokal tidak terblokir.
+
+### Rule 6: AST Token Sanitization & Read-Only Tx untuk AI BI Reporting
+Query SQL yang digenerasi oleh model Text-to-SQL wajib melalui dua lapis pertahanan keamanan sebelum dieksekusi:
+1. **Application-Level AST Sanitizer**: Validasi token regex/tokenizer deterministik yang menolak query multi-pernyataan (karakter `;`) dan menolak seluruh kata kunci modifikasi/destruktif (`DROP`, `DELETE`, `UPDATE`, `INSERT`, `ALTER`, `TRUNCATE`, `GRANT`, `EXEC`, `CREATE`).
+2. **Database-Level Read-Only Transaction**: Dijalankan dalam transaksi isolasi dengan `SET TRANSACTION READ ONLY` serta batas timeout eksekusi ketat `SET statement_timeout = '2500ms'` untuk mencegah resource exhaustion query agregasi berat.
+
+### Rule 7: Zero-Trust Slip Validation & Pessimistic Order Lock
+Ketika bukti transfer diverifikasi oleh worker via antrean RabbitMQ `payment.verify.proof`:
+1. Jika struk terbukti asli (`tamper_detected == false`) dan nominal transfer `>= order.total_amount`, worker mengeksekusi transaksi ACID dengan `SELECT ... FOR UPDATE` pada tabel `orders` dan `order_items`, memindahkan `reserved_stock` &rarr; `sold_stock`, dan mengubah status order menjadi `PAID`.
+2. Jika terdeteksi editan visual (*photoshop/font anomaly*) atau nominal kurang, sistem menandai bukti transfer sebagai `FRAUD_DETECTED / SUSPICIOUS`, mengalihkan status order menjadi `SUSPICIOUS_HOLD` untuk review manual operasional, dan **tidak** melepaskan stok reserved ke pasar bebas demi mencegah *double spending*.
 
 ---
 
@@ -226,6 +267,12 @@ sequenceDiagram
 1. Jalankan backend Go di terminal pertama: `go run ./cmd/api` (port `8080`).
 2. Jalankan Vite dev server dengan *hot-reload* di terminal kedua: `cd frontend && npm run dev` (port `5173`, otomatis mem-proxy `/api` ke `:8080`).
 3. Setelah selesai, jalankan `cd frontend && npm run build` untuk memperbarui bundle produksi di `web/dist/` dan pastikan `vue-tsc` lulus tanpa error tipe data.
+
+### Playbook D: Menambahkan Event Asinkron Baru ke RabbitMQ
+1. Deklarasikan nama antrean dan routing key baru pada `internal/domain/ai_event.go` dan `internal/repository/rabbitmq/client.go`.
+2. Daftarkan binding antrean ke Exchange `oms.events` di fungsi `DeclareTopology` (`internal/repository/rabbitmq/client.go`).
+3. Tambahkan fungsi *publisher* di `internal/repository/rabbitmq/producer.go` dan fungsi *consumer* di `internal/repository/rabbitmq/consumer.go`.
+4. Selalu sertakan `context.WithTimeout` (misal 3.5s - 5s) dan jadwalkan retry dengan exponential backoff (`requeueWithBackoff`) serta pengalihan ke Dead-Letter Exchange (`oms.dlx`) bila melebihi batas percobaan.
 
 ---
 

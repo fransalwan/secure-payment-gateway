@@ -336,38 +336,7 @@ func (s *OMSService) executeQueueJob(ctx context.Context, job *domain.QueueJob) 
 		}
 
 		if !alreadyPaid && ord != nil {
-			// Fan-out to the 3 post-payment 3rd-party fulfillment queues (FR-04)
-			downstreamPayload, _ := json.Marshal(map[string]interface{}{
-				"order_id":       ord.ID.String(),
-				"order_number":   ord.OrderNumber,
-				"courier_code":   ord.CourierCode,
-				"customer_phone": ord.CustomerPhone,
-			})
-
-			_ = s.queueRepo.Enqueue(ctx, &domain.QueueJob{
-				ID:          fmt.Sprintf("job-awb-%s", ord.ID.String()[:8]),
-				QueueName:   domain.QueueLogisticsWaybill,
-				OrderID:     ord.ID.String(),
-				OrderNumber: ord.OrderNumber,
-				Payload:     downstreamPayload,
-				MaxAttempts: 4,
-			})
-			_ = s.queueRepo.Enqueue(ctx, &domain.QueueJob{
-				ID:          fmt.Sprintf("job-sync-%s", ord.ID.String()[:8]),
-				QueueName:   domain.QueueChannelStockSync,
-				OrderID:     ord.ID.String(),
-				OrderNumber: ord.OrderNumber,
-				Payload:     downstreamPayload,
-				MaxAttempts: 4,
-			})
-			_ = s.queueRepo.Enqueue(ctx, &domain.QueueJob{
-				ID:          fmt.Sprintf("job-wa-%s", ord.ID.String()[:8]),
-				QueueName:   domain.QueueNotification,
-				OrderID:     ord.ID.String(),
-				OrderNumber: ord.OrderNumber,
-				Payload:     downstreamPayload,
-				MaxAttempts: 4,
-			})
+			s.FanOutPostPaymentJobs(ctx, ord)
 		}
 		return nil
 
@@ -413,6 +382,44 @@ func (s *OMSService) executeQueueJob(ctx context.Context, job *domain.QueueJob) 
 	default:
 		return nil
 	}
+}
+
+// FanOutPostPaymentJobs dispatches logistics waybill issuance, marketplace stock sync, and customer notification jobs
+func (s *OMSService) FanOutPostPaymentJobs(ctx context.Context, ord *domain.Order) {
+	if ord == nil {
+		return
+	}
+	downstreamPayload, _ := json.Marshal(map[string]interface{}{
+		"order_id":       ord.ID.String(),
+		"order_number":   ord.OrderNumber,
+		"courier_code":   ord.CourierCode,
+		"customer_phone": ord.CustomerPhone,
+	})
+
+	_ = s.queueRepo.Enqueue(ctx, &domain.QueueJob{
+		ID:          fmt.Sprintf("job-awb-%s", ord.ID.String()[:8]),
+		QueueName:   domain.QueueLogisticsWaybill,
+		OrderID:     ord.ID.String(),
+		OrderNumber: ord.OrderNumber,
+		Payload:     downstreamPayload,
+		MaxAttempts: 4,
+	})
+	_ = s.queueRepo.Enqueue(ctx, &domain.QueueJob{
+		ID:          fmt.Sprintf("job-sync-%s", ord.ID.String()[:8]),
+		QueueName:   domain.QueueChannelStockSync,
+		OrderID:     ord.ID.String(),
+		OrderNumber: ord.OrderNumber,
+		Payload:     downstreamPayload,
+		MaxAttempts: 4,
+	})
+	_ = s.queueRepo.Enqueue(ctx, &domain.QueueJob{
+		ID:          fmt.Sprintf("job-wa-%s", ord.ID.String()[:8]),
+		QueueName:   domain.QueueNotification,
+		OrderID:     ord.ID.String(),
+		OrderNumber: ord.OrderNumber,
+		Payload:     downstreamPayload,
+		MaxAttempts: 4,
+	})
 }
 
 func (s *OMSService) ManualRetryJob(ctx context.Context, jobID string) (*domain.QueueJob, error) {

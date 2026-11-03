@@ -39,8 +39,16 @@ func Created(w http.ResponseWriter, message string, data interface{}) {
 	JSON(w, http.StatusCreated, true, message, data, nil)
 }
 
+func Accepted(w http.ResponseWriter, message string, data interface{}) {
+	JSON(w, http.StatusAccepted, true, message, data, nil)
+}
+
 func BadRequest(w http.ResponseWriter, message string, errCode string, details string) {
 	JSON(w, http.StatusBadRequest, false, message, nil, &APIError{Code: errCode, Details: details})
+}
+
+func NotFound(w http.ResponseWriter, message string, details string) {
+	JSON(w, http.StatusNotFound, false, message, nil, &APIError{Code: "NOT_FOUND", Details: details})
 }
 
 func Unauthorized(w http.ResponseWriter, message string, details string) {

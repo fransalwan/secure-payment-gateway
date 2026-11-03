@@ -17,6 +17,7 @@ import {
   Phone,
   MapPin,
   PackageCheck,
+  Sparkles,
 } from '@lucide/vue'
 
 const props = defineProps<{
@@ -27,6 +28,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:open', val: boolean): void
   (e: 'printWaybill', order: Order): void
+  (e: 'verifySlip', order: Order): void
 }>()
 
 const store = useOmsStore()
@@ -193,7 +195,11 @@ async function handleCancel() {
       </div>
 
       <!-- Primary Operational Actions (Thumb-Friendly Full Width on Mobile) -->
-      <div v-if="order.status === 'PENDING_PAYMENT'" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+      <div v-if="order.status === 'PENDING_PAYMENT' || order.status === 'SUSPICIOUS_HOLD'" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+        <Button variant="emerald" size="lg" class="w-full sm:col-span-2" @click="emit('verifySlip', order)">
+          <Sparkles class="w-4 h-4" />
+          <span>Upload &amp; Verifikasi Struk Bank (Vision AI)</span>
+        </Button>
         <Button variant="indigo" size="lg" class="w-full" @click="handleSimulatePay">
           <CreditCard class="w-4 h-4" />
           <span>Simulasi Bayar (HMAC Webhook)</span>

@@ -16,6 +16,7 @@ const (
 	OrderStatusShipped        OrderStatus = "SHIPPED"
 	OrderStatusCompleted      OrderStatus = "COMPLETED"
 	OrderStatusCancelled      OrderStatus = "CANCELLED"
+	OrderStatusSuspiciousHold OrderStatus = "SUSPICIOUS_HOLD"
 )
 
 type OrderChannel string

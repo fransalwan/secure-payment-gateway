@@ -53,6 +53,25 @@ services:
       timeout: 5s
       retries: 10
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: spg-prod-rabbitmq
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Jakarta
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-spg_rabbit}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-change_me_strong_rabbitmq_password}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/}
+    volumes:
+      - rabbitmq_prod_data:/var/lib/rabbitmq
+    networks:
+      - oms_internal
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   oms-api:
     build:
       context: .
@@ -64,6 +83,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     environment:
       APP_PORT: "8080"
@@ -81,6 +102,11 @@ services:
       REDIS_ADDR: redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_DB: "0"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:-spg_rabbit}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-change_me_strong_rabbitmq_password}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
       AES_SECRET_KEY: ${AES_SECRET_KEY:-01234567890123456789012345678901}
       HMAC_SECRET_KEY: ${HMAC_SECRET_KEY:-change_me_prod_hmac_secret_key}
       HMAC_TIMESTAMP_TOLERANCE_SECONDS: ${HMAC_TIMESTAMP_TOLERANCE_SECONDS:-300}
@@ -119,6 +145,11 @@ services:
       REDIS_ADDR: redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_DB: "0"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:-spg_rabbit}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-change_me_strong_rabbitmq_password}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
       AES_SECRET_KEY: ${AES_SECRET_KEY:-01234567890123456789012345678901}
       HMAC_SECRET_KEY: ${HMAC_SECRET_KEY:-change_me_prod_hmac_secret_key}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-change_me_prod_webhook_secret}
@@ -160,6 +191,7 @@ networks:
 volumes:
   postgres_prod_data:
   redis_prod_data:
+  rabbitmq_prod_data:
   caddy_data:
   caddy_config:
 

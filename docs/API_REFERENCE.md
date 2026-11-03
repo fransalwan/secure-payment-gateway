@@ -189,3 +189,99 @@ Mereset penghitung kegagalan job berstatus `FAILED` (DLQ) dan memasukkannya kemb
 | `POST` | `/api/v1/reconciliation/upload` | `multipart/form-data` (`bank_name`, `file`) | Unggah CSV laporan settlement bank untuk *3-Way Matching*. |
 | `GET` | `/api/v1/reconciliation/batches` | — | Daftar riwayat batch rekonsiliasi settlement. |
 | `GET` | `/api/v1/reconciliation/batches/{id}` | — | Rincian item kecocokan & selisih nominal per batch. |
+
+---
+
+## 4. AI-Powered FinTech Workflows (Vision Slip & Text-to-SQL)
+
+### `POST /api/v1/payments/proof`
+Mengunggah file struk transfer bank (multipart/form-data atau JSON payload dengan `image_base64`). Merespons seketika dengan `202 Accepted` (< 20ms) dan menerbitkan event ke RabbitMQ Exchange `oms.events` (routing key `payment.verify`).
+
+* **Request Form / Body**:
+  * `order_id` (string, UUID, wajib): ID pesanan yang dibayar.
+  * `slip` (file binary multipart, opsional jika `image_base64` diisi): Gambar format `image/jpeg` atau `image/png`.
+  * `image_base64` (string text, opsional): Representasi Base64 dari gambar struk atau representasi teks transfer.
+* **Response `202 Accepted`**:
+```json
+{
+  "code": 202,
+  "message": "Payment slip accepted for asynchronous AI verification",
+  "data": {
+    "proof_id": "c1111111-1111-1111-1111-111111111199",
+    "order_id": "b1111111-1111-1111-1111-111111111101",
+    "status": "PROCESSING",
+    "trace_id": "tr-abc12345"
+  }
+}
+```
+
+---
+
+### `GET /api/v1/payments/proof/{id}`
+Mengambil detail hasil verifikasi bukti transfer Vision AI setelah dikonsumsi oleh RabbitMQ worker.
+
+* **Response `200 OK`**:
+```json
+{
+  "code": 200,
+  "data": {
+    "id": "c1111111-1111-1111-1111-111111111199",
+    "order_id": "b1111111-1111-1111-1111-111111111101",
+    "order_number": "ORD-20261104-BCA1",
+    "status": "VERIFIED",
+    "bank_name": "BCA",
+    "sender_name": "EKO PRASETYO",
+    "amount": 378000,
+    "reference_number": "TRX-982137912",
+    "tamper_detected": false,
+    "confidence_score": 0.99,
+    "extracted_text": "TRANSFER BERHASIL ...",
+    "created_at": "2026-11-04T00:15:20Z",
+    "verified_at": "2026-11-04T00:15:21Z"
+  }
+}
+```
+*(Status: `"PENDING"`, `"PROCESSING"`, `"VERIFIED"`, `"FAILED"`, `"FRAUD_DETECTED"`)*
+
+---
+
+### `GET /api/v1/payments/proof`
+Mengambil daftar seluruh riwayat bukti transfer bank merchant.
+
+---
+
+### `POST /api/v1/reports/ask-ai`
+Eksekusi query laporan analitik bisnis berbasis bahasa alami (Natural Language Text-to-SQL) dengan AST token sanitizer, read-only PostgreSQL transaction, dan rekomendasi chart visual.
+
+* **Request Body**:
+```json
+{
+  "question": "Berapa total GMV dan jumlah pesanan per status sepanjang minggu ini?",
+  "merchant_id": "11111111-1111-1111-1111-111111111111"
+}
+```
+* **Response `200 OK`**:
+```json
+{
+  "code": 200,
+  "data": {
+    "question": "Berapa total GMV dan jumlah pesanan per status sepanjang minggu ini?",
+    "generated_sql": "SELECT status, COUNT(*) AS total_orders, COALESCE(SUM(total_amount), 0) AS gmv FROM orders GROUP BY status ORDER BY gmv DESC LIMIT 100;",
+    "explanation": "Query ini menghitung akumulasi total pendapatan (GMV) dan volume pesanan dikelompokkan berdasarkan status.",
+    "is_safe": true,
+    "execution_time_ms": 14,
+    "row_count": 3,
+    "columns": ["status", "total_orders", "gmv"],
+    "rows": [
+      {"status": "PAID", "total_orders": 8, "gmv": 3024000},
+      {"status": "READY_TO_SHIP", "total_orders": 4, "gmv": 1512000},
+      {"status": "PENDING_PAYMENT", "total_orders": 2, "gmv": 756000}
+    ],
+    "chart_type": "bar",
+    "chart_config": {
+      "x_axis": "status",
+      "y_axis": "gmv"
+    }
+  }
+}
+```

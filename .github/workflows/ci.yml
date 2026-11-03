@@ -76,6 +76,7 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -d secure_payment_gateway -f migrations/000001_init_schema.up.sql
           PGPASSWORD=postgres psql -h localhost -U postgres -d secure_payment_gateway -f migrations/000002_reconciliation_schema.up.sql
           PGPASSWORD=postgres psql -h localhost -U postgres -d secure_payment_gateway -f migrations/000003_oms_schema.up.sql
+          PGPASSWORD=postgres psql -h localhost -U postgres -d secure_payment_gateway -f migrations/000004_payment_proofs_and_ai_audit.up.sql
 
       - name: Build All Go Packages
         run: go build -v ./...
