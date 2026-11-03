@@ -199,6 +199,8 @@ func main() {
 
 		// Multimodal Vision AI Bank Slip Verification (Async RabbitMQ Pipeline)
 		r.Post("/payments/proof", proofHandler.UploadProof)
+		r.Get("/payments/proof", proofHandler.ListProofs)
+		r.Get("/payments/proof/{id}", proofHandler.GetProof)
 		r.Get("/payments/proofs", proofHandler.ListProofs)
 		r.Get("/payments/proofs/{id}", proofHandler.GetProof)
 
