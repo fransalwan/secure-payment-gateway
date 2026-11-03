@@ -30,3 +30,4 @@ func (h *AITelemetryHandler) GetTelemetrySummary(w http.ResponseWriter, r *http.
 
 	response.OK(w, "AI Telemetry and FinOps metrics retrieved", summary)
 }
+

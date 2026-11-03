@@ -96,8 +96,8 @@ flowchart TB
 | `internal/repository/postgres/` | Seluruh query SQL menggunakan `pgx/v5`, transaksi ACID, dan *row-level locking* (`payment_proof_repo.go`, `reporting_repo.go`, `oms_repo.go`). | Semua operasi tulis multi-tabel **wajib** dibungkus `pool.BeginTx(ctx, pgx.TxOptions{})` dengan `defer tx.Rollback(ctx)`. |
 | `internal/service/` | Orkestrasi aturan bisnis, verifikasi slip Multimodal AI (`ai_vision_service.go`), Text-to-SQL Reporting (`report_ai_service.go`), simulator konkurensi, dan *integration tests*. | Lihat `ai_enterprise_workflows_test.go` dan `critical_workflows_test.go` sebagai spesifikasi hidup (*living specification*). |
 | `internal/handler/http/` | HTTP handlers Chi: `payment_proof_handler.go` (Fast ACK `202 Accepted`), `report_handler.go` (Text-to-SQL BI), `oms_handler.go`. | Validasi payload, enkapsulasi status code, fast ACK, dan pendelegasian ke service layer. |
-| `pkg/crypto/` | Primitif keamanan: `AES-256-GCM`, `HMAC-SHA256` (*constant-time*), dan `SHA-256` *hash chain*. | Jangan pernah mengganti `hmac.Equal` dengan operator `==` biasa untuk menghindari *timing side-channel attack*. |
-| `migrations/` | Skrip DDL PostgreSQL berurutan (`000001` s/d `000004`) beserta skrip *rollback* (`.down.sql`). | Migrasi `000004` menambahkan tabel `payment_proofs`, `ai_reporting_audit_logs`, serta status `SUSPICIOUS_HOLD`. |
+| `pkg/crypto/` | Primitif keamanan: `AES-256-GCM`, `HMAC-SHA256` (*constant-time*), `SHA-256` *hash chain*, dan `phash.go` (64-bit Difference Hash `dHash` untuk deteksi duplikasi struk bank transfer berjarak Hamming $\le 5$). | Jangan pernah mengganti `hmac.Equal` dengan operator `==` biasa untuk menghindari *timing side-channel attack*. |
+| `migrations/` | Skrip DDL PostgreSQL berurutan (`000001` s/d `000005`) beserta skrip *rollback* (`.down.sql`). | Migrasi `000004` menambahkan `payment_proofs` & audit logs; migrasi `000005` menambahkan `outbox_events`, `ai_telemetry_events`, serta kolom `image_phash` & `is_duplicate_image`. |
 | `frontend/` | Source code aplikasi SPA **Vue 3 + TypeScript + Pinia + Tailwind CSS v4 + `shadcn-vue` (`Reka UI` & `Vaul` Mobile Drawer)**. | Dilengkapi `PaymentSlipModal.vue` dan `AiReportingPanel.vue`. Hasil build (`npm run build`) dikompilasi ke `web/dist`. |
 
 ---
@@ -151,6 +151,10 @@ Query SQL yang digenerasi oleh model Text-to-SQL wajib melalui dua lapis pertaha
 Ketika bukti transfer diverifikasi oleh worker via antrean RabbitMQ `payment.verify.proof`:
 1. Jika struk terbukti asli (`tamper_detected == false`) dan nominal transfer `>= order.total_amount`, worker mengeksekusi transaksi ACID dengan `SELECT ... FOR UPDATE` pada tabel `orders` dan `order_items`, memindahkan `reserved_stock` &rarr; `sold_stock`, dan mengubah status order menjadi `PAID`.
 2. Jika terdeteksi editan visual (*photoshop/font anomaly*) atau nominal kurang, sistem menandai bukti transfer sebagai `FRAUD_DETECTED / SUSPICIOUS`, mengalihkan status order menjadi `SUSPICIOUS_HOLD` untuk review manual operasional, dan **tidak** melepaskan stok reserved ke pasar bebas demi mencegah *double spending*.
+
+### Rule 8: Transactional Outbox Pattern & pHash Duplicate Receipt Pre-Filter
+1. **Zero Dual-Write Integrity**: Handler pembayaran dilarang mempublikasikan event secara langsung ke broker sebelum commit database. Transaksi PostgreSQL atomik menulis record bisnis dan antrean `outbox_events` secara bersamaan. Outbox Worker membaca baris `PENDING` dengan `SELECT ... FOR UPDATE SKIP LOCKED` lalu mendispatch ke RabbitMQ `oms.events`.
+2. **Perceptual Hashing (pHash dHash 64-bit) Anti-Duplicate**: Setiap struk dihitung nilai 64-bit dHash sebelum pemanggilan AI. Gambar dengan jarak Hamming $\le 5$ dibandingkan riwayat struk sebelumnya langsung ditandai `is_duplicate_image = true` dan diisolasi ke `SUSPICIOUS_HOLD` dalam waktu $< 10$ms, mencegah pembakaran token LLM Vision yang sia-sia dan meniadakan penipuan upload struk berulang.
 
 ---
 

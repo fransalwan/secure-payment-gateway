@@ -56,3 +56,4 @@ func TestDHashCalculationAndHammingDistance(t *testing.T) {
 		t.Fatalf("Expected near duplicate distance <= 5, got: %d", distNear)
 	}
 }
+

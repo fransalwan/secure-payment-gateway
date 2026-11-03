@@ -90,3 +90,4 @@ func HammingDistanceHex(hex1, hex2 string) int {
 	}
 	return bits.OnesCount64(v1 ^ v2)
 }
+

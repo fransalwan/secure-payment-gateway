@@ -18,12 +18,13 @@
 
 Platform B2B Merchant FinTech yang menyatukan pesanan dari **Web Checkout**, **Marketplace Webhook (Shopee / TikTok Shop)**, **Manual Bank Transfer**, dan **Social Commerce Chat (WhatsApp / Live Selling via AI)**, dilengkapi:
 1. **Asynchronous Vision-AI Bank Slip Validator & pHash Anti-Fraud**: Validasi bukti transfer bank (BCA, Mandiri, BRI, BNI, QRIS) berbasis Gemini 1.5 Multimodal Vision AI dengan deteksi keaslian gambar visual (*tamper check*) dan **Perceptual Hash (dHash 64-bit)** untuk mendeteksi struk editan/crop duplikat (< 10ms). Transisi status atomik ACID (`PAID` vs `SUSPICIOUS_HOLD`) via fast ACK (`202 Accepted`).
-2. **Transactional Outbox Pattern & RabbitMQ Worker Pipeline**: Eliminasi *Dual-Write Problem* antara PostgreSQL dan RabbitMQ Topic Exchange `oms.events`. Pemisahan eksekusi AI/LLM lambat (2-4s) via *Worker Goroutines Pool* (QoS prefetch 10), context timeout (3.5s), *Exponential Backoff Retry* (`2s, 4s, 8s`), dan *Dead-Letter Exchange (`oms.dlx`)*.
-3. **Enterprise Natural Language Text-to-SQL Reporting**: Mesin pelaporan analitik bisnis (*Business Intelligence*) berbasis Gemini LLM dengan *Schema Grounding*, AST Token Sanitizer anti-SQL Injection, batas eksekusi read-only PostgreSQL (`statement_timeout = 2500ms`), dan rekomendasi visualisasi grafik otomatis.
-4. **Multi-Channel 3-State Inventory & Anti-Overselling Engine**: Penguncian baris deterministik PostgreSQL (`SELECT ... FOR UPDATE` + `WHERE available_stock >= $1`) dengan 3 status stok (`available_stock`, `reserved_stock`, `sold_stock`) yang menjamin **nol stok minus (*zero overselling*)** saat *flash sale*.
-5. **Secure Payment Switch & Idempotent Webhook**: Verifikasi tanda tangan *constant-time* `HMAC-SHA256`, proteksi *replay attack* (`<= 5 menit`), deduplikasi atomik `UNIQUE(provider, external_event_id)` di `webhook_events` (`< 50ms` fast ACK), dan pembukuan akuntansi berpasangan (*Double-Entry Ledger*).
-6. **Structured Logging & Enterprise Tracing (`rs/zerolog`)**: Structured logging berkinerja tinggi berbasis Zero Allocation JSON, injeksi Trace ID terpadu lintas HTTP request dan RabbitMQ event, serta audit trail kepatuhan FinTech.
-7. **Modern Mobile-First `shadcn-vue` SaaS UI**: Arsitektur antarmuka **Vue 3 + TypeScript + Pinia + `Reka UI` + `Vaul`** dengan *Adaptive App Shell*, *Command Palette (`Ctrl+K`)*, *Payment Slip AI Inspector*, *Natural Language Text-to-SQL Console*, **Microsecond Lock Waterfall Lab**, serta cetak resi **Thermal A6 (`100x150mm`)**.
+2. **Transactional Outbox Pattern & RabbitMQ Worker Pipeline**: Eliminasi total *Dual-Write Problem* antara PostgreSQL dan broker event. Data bisnis dan event ditulis dalam transaksi ACID atomik di tabel `outbox_events`, lalu didispatch secara konkuren via `SELECT ... FOR UPDATE SKIP LOCKED` ke RabbitMQ Topic Exchange `oms.events`. Pemisahan eksekusi AI/LLM lambat (2-4s) via *Worker Goroutines Pool* (QoS prefetch 10), context timeout (3.5s), *Exponential Backoff Retry* (`2s, 4s, 8s`), dan *Dead-Letter Exchange (`oms.dlx`)*.
+3. **Enterprise Semantic Metrics Layer & Natural Language Text-to-SQL**: Mesin pelaporan analitik bisnis (*Business Intelligence*) berbasis Gemini LLM dengan *Semantic Metric Layer* (rumus baku GMV, Net Revenue, Receivables, Quarantine Volume), AST Token Sanitizer anti-SQL Injection deterministik, batas eksekusi read-only PostgreSQL (`statement_timeout = 2500ms`), dan visualisasi grafik otomatis.
+4. **AI FinOps & Observability Cockpit (`/api/v1/ai/telemetry`)**: Telemetri produksi real-time yang memantau konsumsi token (Vision & SQL), estimasi biaya model dalam USD ($), rata-rata latensi inferensi vs SLA Fast-ACK (< 20ms), rasio karantina penipuan (*fraud quarantine rate*), dan monitoring kesehatan status antrean *Transactional Outbox*.
+5. **Multi-Channel 3-State Inventory & Anti-Overselling Engine**: Penguncian baris deterministik PostgreSQL (`SELECT ... FOR UPDATE` + `WHERE available_stock >= $1`) dengan 3 status stok (`available_stock`, `reserved_stock`, `sold_stock`) yang menjamin **nol stok minus (*zero overselling*)** saat *flash sale*.
+6. **Secure Payment Switch & Idempotent Webhook**: Verifikasi tanda tangan *constant-time* `HMAC-SHA256`, proteksi *replay attack* (`<= 5 menit`), deduplikasi atomik `UNIQUE(provider, external_event_id)` di `webhook_events` (`< 50ms` fast ACK), dan pembukuan akuntansi berpasangan (*Double-Entry Ledger*).
+7. **Structured Logging & Enterprise Tracing (`rs/zerolog`)**: Structured logging berkinerja tinggi berbasis Zero Allocation JSON, injeksi Trace ID terpadu lintas HTTP request dan RabbitMQ event, serta audit trail kepatuhan FinTech.
+8. **Modern Mobile-First `shadcn-vue` SaaS UI & Recruiter Guided Sandbox**: Arsitektur antarmuka **Vue 3 + TypeScript + Pinia + `Reka UI` + `Vaul`** dengan *Recruiter Guided Cockpit* (4 pill interaktif 1-klik untuk live demo), *Command Palette (`Ctrl+K`)*, *Payment Slip AI Inspector*, *Natural Language Text-to-SQL Console*, **Microsecond Lock Waterfall Lab**, serta cetak resi **Thermal A6 (`100x150mm`)**.
 
 ---
 
@@ -44,33 +45,37 @@ Repositori ini dilengkapi dokumentasi teknis terstruktur untuk mempermudah *onbo
 ```
 +-----------------------------------------------------------------------------------------+
 |             FRONTEND: Vue 3 + TypeScript + Pinia + shadcn-vue (Reka UI/Vaul)            |
-|  [Mobile-First Shell] [Ctrl+K Command] [3-State Stock] [Payment Slip AI] [Ask-AI BI]   |
+|  [Recruiter Guided Cockpit] [AI FinOps Telemetry] [Payment Slip AI] [Text-to-SQL BI]    |
 +--------------------+-----------------------------------+--------------------------------+
                      | REST API (JSON / Multipart)       | Simulasi Webhook (HMAC)
                      v                                   v
 +-----------------------------------------------------------------------------------------+
 |                      BACKEND: Golang (Chi Router + rs/zerolog)                          |
 |                                                                                         |
-|  1. Order & Webhook Engine        2. RabbitMQ Event Producer    3. Safe BI Query Engine |
-|     - Verify Constant-Time HMAC      - Topic: 'oms.events'         - Gemini Text-to-SQL |
-|     - Deduplication Idempotency      - Keys: 'order.parse',        - AST Token Security |
-|     - Fast ACK (< 20ms, 202/200)       'payment.verify'            - Read-Only Tx 2500ms|
-+--------------------+-----------------------------------+--------------------------------+
-                     |                                   | Async Publish
-                     v ACID Lock                         v
-+------------------------------------+   +------------------------------------------------+
-|      DATABASE: PostgreSQL 16       |   |         MESSAGE BROKER: RabbitMQ 3.13          |
-|  - merchants & accounts            |   |  - Exchange: oms.events (Topic)                |
-|  - products (avail/reserved/sold)  |   |  - Queues: order.parse.queue,                  |
-|  - orders & order_items            |   |            payment.verify.proof                |
-|  - payment_proofs & audit logs     |   |  - Dead-Letter Exchange: oms.dlx -> oms.dlq   |
-|  - webhook_events & ledger_entries |   +-----------------------+------------------------+
-+------------------------------------+                           | QoS Prefetch (10)
-                     ^                                           v
+|  1. Ingestion & pHash Pre-Filter   2. Safe BI Query Engine       3. AI FinOps Telemetry |
+|     - 64-bit dHash (Hamming <= 5)     - Grounded Semantic Rules     - Token & Cost Track|
+|     - Constant-Time HMAC-SHA256       - AST Token Security          - P99 vs SLA Metric |
+|     - Fast ACK (< 20ms, 202/200)      - Read-Only Tx 2500ms         - GET /ai/telemetry |
++--------------------+--------------------------------------------------------------------+
+                     | ACID Dual-Write Protection (Atomic Insert)
+                     v
++------------------------------------+
+|      DATABASE: PostgreSQL 16       |
+|  - outbox_events (PENDING/DONE)    |--------+ (Worker Polling: SELECT FOR UPDATE SKIP LOCKED)
+|  - payment_proofs (image_phash)    |        v
+|  - ai_telemetry_events             |   +------------------------------------------------+
+|  - products (3-state inventory)    |   |         MESSAGE BROKER: RabbitMQ 3.13          |
+|  - orders & ledger_entries         |   |  - Exchange: oms.events (Topic)                |
++------------------------------------+   |  - Queues: order.parse.queue,                  |
+                     ^                   |            payment.verify.proof                |
+                     |                   |  - Dead-Letter Exchange: oms.dlx -> oms.dlq   |
+                     |                   +-----------------------+------------------------+
+                     | ACID Pessimistic                          | QoS Prefetch (10)
+                     | Row Locking                               v
                      |                     +----------------------------------------------+
                      |                     |       BACKGROUND WORKER GOROUTINES POOL      |
-                     | ACID Pessimistic    |  - Multimodal Gemini Vision Slip Validator   |
-                     +---------------------+  - Tamper Detection & Confidence Scoring     |
+                     +---------------------+  - Multimodal Gemini Vision Slip Validator   |
+                                           |  - Tamper Detection & Confidence Scoring     |
                                            |  - Atomic Settle -> PAID / SUSPICIOUS_HOLD   |
                                            |  - Exponential Backoff (2s, 4s, 8s) & DLX    |
                                            +----------------------------------------------+
@@ -80,9 +85,15 @@ Repositori ini dilengkapi dokumentasi teknis terstruktur untuk mempermudah *onbo
 
 ## 🎨 Modern Web & Mobile-First UI Architecture
 
+* **Recruiter & Tech Lead Guided Sandbox Cockpit**: 4 pill interaktif 1-klik di bagian atas dashboard untuk demo instan dalam 60 detik:
+  1. `Struk Valid (202 Fast-ACK)`: Verifikasi bukti bayar asli BCA dengan respon cepat `< 20ms`.
+  2. `Struk Duplikat (pHash Test)`: Deteksi fraud instan struk duplikat via 64-bit dHash tanpa membuang biaya token LLM.
+  3. `Text-to-SQL BI (GMV Matrix)`: Pertanyaan analitik bisnis ter-grounding dengan aturan semantik metrik dan proteksi AST.
+  4. `AI FinOps Cockpit (Cost & Latency)`: Panel observabilitas metrik token, estimasi biaya FinOps ($), dan latensi SLA.
 * **`shadcn-vue` (`Reka UI`) + `Vaul` Adaptive Overlays**: Komponen `ResponsiveDialog` menyajikan *accessible modal / right slide-over sheet* di Desktop (`>= 768px`) dan otomatis bertransformasi menjadi **Swipeable Bottom Sheet** ber-unit `dvh` (*Dynamic Viewport Height*) di Mobile (`< 768px`) sehingga tidak terpotong oleh *virtual keyboard*.
-* **Payment Slip AI Inspector Modal**: Modal interaktif dengan *drag-drop file upload*, simulator instan 1-klik (Struk BCA Valid, Struk Editan/Manipulasi, dan Mismatch Nominal), deteksi *fraud* visual, serta sinkronisasi status otomatis.
+* **Payment Slip AI Inspector Modal**: Modal interaktif dengan *drag-drop file upload*, simulator instan 1-klik (Struk BCA Valid, Struk Editan/Manipulasi, Mismatch Nominal, dan Struk Duplikat pHash), deteksi *fraud* visual, serta sinkronisasi status otomatis.
 * **Natural Language Text-to-SQL Reporting Panel**: Konsol pelaporan bisnis berbasis bahasa alami dengan preset query finansial, indikator validasi keamanan AST, format hasil tabel dinamis, dan rekomendasi chart.
+* **AI FinOps & Observability Cockpit Panel**: Monitoring langsung konsumsi token per modalitas, estimasi biaya operasional USD ($), rasio karantina penipuan, dan kesehatan Transactional Outbox.
 * **CSS `@container` Query Responsive Tables**: Tabel pesanan, inventori, dan buku besar otomatis berubah dari tabel multi-kolom ber-*sticky header* menjadi **Actionable Mobile Fulfillment Cards** saat lebar kontainer `< 640px`.
 * **Native CSS `light-dark()` Dual Theme & SPA View Transitions**: Mendukung tema *System / Light / Dark* bebas FOUC melalui `<meta name="color-scheme">` serta transisi mulus menggunakan `document.startViewTransition` dan notifikasi `vue-sonner`.
 
