@@ -90,7 +90,7 @@ const openAPISpecJSON = `{
   "info": {
     "title": "AI-Powered Omni-Channel FinTech OMS & Secure Payment Gateway API",
     "version": "1.4.0",
-    "description": "Dokumentasi resmi REST API untuk **AI-Powered Omni-Channel FinTech OMS & Secure Payment Gateway** (Kandidat: **Frans Alwan Purba** — Midle Programmer PT. Jiwa Muda Cipta Indonesia `R260032`). Mencakup manajemen stok 3-status dengan penguncian PostgreSQL `SELECT ... FOR UPDATE`, verifikasi bukti bayar AI, buku besar akuntansi berpasangan (*Immutable Double-Entry Ledger*), enkripsi KYC `AES-256-GCM`, serta rekonsiliasi mutasi bank 3-arah.",
+    "description": "Dokumentasi resmi REST API untuk **AI-Powered Omni-Channel FinTech OMS & Secure Payment Gateway** (Kandidat: **Frans Alwan Purba** — Midle Programmer PT. Jiwa Muda Cipta Indonesia R260032). Mencakup manajemen stok 3-status dengan penguncian PostgreSQL SELECT ... FOR UPDATE, verifikasi bukti bayar AI, buku besar akuntansi berpasangan (Immutable Double-Entry Ledger), enkripsi KYC AES-256-GCM, serta rekonsiliasi mutasi bank 3-arah.",
     "contact": {
       "name": "Frans Alwan Purba",
       "url": "https://github.com/fransalwan/secure-payment-gateway"
