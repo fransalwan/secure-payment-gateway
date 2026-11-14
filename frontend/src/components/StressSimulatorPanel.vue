@@ -60,24 +60,24 @@ async function triggerWebhookSim() {
 
     <div class="p-4 sm:p-5 grid grid-cols-1 xl:grid-cols-2 gap-4">
       <!-- Left: 10 Concurrent Buyers for 1 Last Stock -->
-      <div class="rounded-2xl bg-elevated/45 border border-border p-4 flex flex-col justify-between space-y-4">
-        <div class="space-y-2.5">
+      <div class="rounded-2xl bg-elevated/45 border border-border p-4 flex flex-col justify-between space-y-4 min-w-0 overflow-hidden">
+        <div class="space-y-2.5 min-w-0">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="text-xs font-extrabold uppercase tracking-wider text-tone-amber flex items-center gap-1.5">
-              <Lock class="w-3.5 h-3.5" />
-              <span>1. Flash-Sale Anti-Overselling Test</span>
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-tone-amber flex items-center gap-1.5 min-w-0">
+              <Lock class="w-3.5 h-3.5 shrink-0" />
+              <span class="truncate">1. Flash-Sale Anti-Overselling Test</span>
             </h3>
-            <span class="font-mono text-[10px] text-muted-foreground">10 Goroutines // 1 Stok</span>
+            <span class="font-mono text-[10px] text-muted-foreground shrink-0">10 Goroutines // 1 Stok</span>
           </div>
           <p class="text-xs text-muted-foreground leading-relaxed">
             Mereset stok SKU terpilih menjadi <strong class="text-foreground">1 pcs</strong>, lalu menembakkan <strong class="text-foreground">10 request checkout paralel</strong> pada mikrodetik yang sama dari kanal Web, Shopee, TikTok &amp; WA.
           </p>
 
-          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1 min-w-0">
             <select
               v-model="selectedProductId"
               aria-label="Pilih SKU target simulasi race condition"
-              class="flex-1 rounded-xl bg-card border border-border px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              class="flex-1 min-w-0 w-full truncate rounded-xl bg-card border border-border px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option v-for="p in store.products" :key="p.id" :value="p.id">
                 {{ p.sku }} — {{ p.name }} (Stok: {{ p.available_stock }})
@@ -87,10 +87,10 @@ async function triggerWebhookSim() {
             <Button
               variant="amber"
               :disabled="store.isSimulatingRace"
-              class="w-full sm:w-auto shrink-0"
+              class="w-full sm:w-auto shrink-0 whitespace-nowrap"
               @click="triggerRaceSim"
             >
-              <Zap class="w-3.5 h-3.5" />
+              <Zap class="w-3.5 h-3.5 shrink-0" />
               <span>{{ store.isSimulatingRace ? 'Menembak 10 Buyer...' : 'Simulate 10 Concurrent Buyers' }}</span>
             </Button>
           </div>
@@ -150,14 +150,14 @@ async function triggerWebhookSim() {
       </div>
 
       <!-- Right: 5x Duplicate Payment Webhook -->
-      <div class="rounded-2xl bg-elevated/45 border border-border p-4 flex flex-col justify-between space-y-4">
-        <div class="space-y-2.5">
+      <div class="rounded-2xl bg-elevated/45 border border-border p-4 flex flex-col justify-between space-y-4 min-w-0 overflow-hidden">
+        <div class="space-y-2.5 min-w-0">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="text-xs font-extrabold uppercase tracking-wider text-tone-indigo flex items-center gap-1.5">
-              <ShieldCheck class="w-3.5 h-3.5" />
-              <span>2. 5x Duplicate Payment Webhook Test</span>
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-tone-indigo flex items-center gap-1.5 min-w-0">
+              <ShieldCheck class="w-3.5 h-3.5 shrink-0" />
+              <span class="truncate">2. 5x Duplicate Payment Webhook Test</span>
             </h3>
-            <span class="font-mono text-[10px] text-muted-foreground">HMAC-SHA256 + Idempotency</span>
+            <span class="font-mono text-[10px] text-muted-foreground shrink-0">HMAC-SHA256 + Idempotency</span>
           </div>
           <p class="text-xs text-muted-foreground leading-relaxed">
             Menembakkan <strong class="text-foreground">5 webhook <code>payment.succeeded</code> identik</strong> dengan <code>X-Webhook-Id</code> yang sama ke <code>POST /api/v1/webhooks/payment</code> untuk membuktikan respons <code>&lt; 50ms</code> &amp; proteksi pemotongan stok ganda.
