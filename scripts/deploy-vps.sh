@@ -23,17 +23,22 @@ if [ ! -f "$ENV_FILE" ]; then
   AES_KEY="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
   DB_PASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
   REDIS_PASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
+  RABBIT_PASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
   HMAC_KEY="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
   WEBHOOK_KEY="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
 
   cat > "$ENV_FILE" <<EOF
 APP_DOMAIN=${DOMAIN_ARG:-:80}
+ENABLE_EMBEDDED_WORKER=true
 DB_USER=spg_prod
 DB_PASSWORD=${DB_PASS}
 DB_NAME=secure_payment_gateway
 DB_MAX_OPEN_CONNS=25
 DB_MAX_IDLE_CONNS=10
 REDIS_PASSWORD=${REDIS_PASS}
+RABBITMQ_USER=spg_rabbit
+RABBITMQ_PASSWORD=${RABBIT_PASS}
+RABBITMQ_VHOST=/
 AES_SECRET_KEY=${AES_KEY}
 HMAC_SECRET_KEY=${HMAC_KEY}
 HMAC_TIMESTAMP_TOLERANCE_SECONDS=300

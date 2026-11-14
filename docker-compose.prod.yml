@@ -89,8 +89,8 @@ services:
     environment:
       APP_PORT: "8080"
       APP_ENV: production
-      # Decouple HTTP Webhook/API receiver from background queue processing
-      ENABLE_EMBEDDED_WORKER: "false"
+      # Keep embedded worker active so in-memory/Redis queue telemetry & Chaos DLQ simulator work in real time on the dashboard
+      ENABLE_EMBEDDED_WORKER: ${ENABLE_EMBEDDED_WORKER:-true}
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: ${DB_USER:-postgres}
