@@ -314,6 +314,36 @@ export const useOmsStore = defineStore('oms', () => {
     }
   }
 
+  async function resetDemoState() {
+    isLoading.value = true
+    const t0 = performance.now()
+    try {
+      const res = await fetch('/api/v1/simulator/reset-demo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      lastApiLatencyMs.value = Math.round(performance.now() - t0)
+      const data = await res.json()
+      if (res.ok && data.success) {
+        toast.success('Demo State Berhasil Direset!', {
+          description: 'Stok produk (SKU-1 = 1 pcs), pesanan, dan status telah dikembalikan ke baseline pengujian JMC.',
+        })
+        await fetchOverview()
+        return true
+      } else {
+        toast.error('Gagal Mereset Demo State', {
+          description: data?.error?.details || 'Terjadi kesalahan pada database',
+        })
+        return false
+      }
+    } catch (e: any) {
+      toast.error('Gagal Mereset State', { description: e.message })
+      return false
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   return {
     merchants,
     activeMerchantId,
@@ -349,6 +379,7 @@ export const useOmsStore = defineStore('oms', () => {
     setChaosMode,
     retryJob,
     fetchCoreGatewayData,
+    resetDemoState,
   }
 })
 

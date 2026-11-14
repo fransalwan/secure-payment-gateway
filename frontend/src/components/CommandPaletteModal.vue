@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import ResponsiveDialog from './ui/ResponsiveDialog.vue'
 import Badge from './ui/Badge.vue'
 import { useOmsStore } from '../stores/omsStore'
+import { useAuthStore } from '../stores/authStore'
 import { useThemeScheme, type ColorSchemePref } from '../composables/useThemeScheme'
 import {
   Search,
@@ -19,6 +20,8 @@ import {
   Moon,
   Monitor,
   ArrowRight,
+  UserCheck,
+  RotateCcw,
 } from '@lucide/vue'
 
 export type NavSection = 'orders' | 'inventory' | 'lab' | 'queues' | 'ledger' | 'reports' | 'telemetry'
@@ -35,12 +38,13 @@ const emit = defineEmits<{
 }>()
 
 const store = useOmsStore()
+const authStore = useAuthStore()
 const { storedScheme, systemIsDark, setScheme } = useThemeScheme()
 const query = ref('')
 
 interface ActionItem {
   id: string
-  group: 'Simulasi Live & AI' | 'Navigasi Modul'
+  group: 'JMC Assessment & Demo' | 'Simulasi Live & AI' | 'Navigasi Modul'
   title: string
   subtitle: string
   badge?: string
@@ -50,6 +54,32 @@ interface ActionItem {
 }
 
 const actions = computed<ActionItem[]>(() => [
+  {
+    id: 'jmc-switch-account',
+    group: 'JMC Assessment & Demo',
+    title: 'Ganti Akun Demo Pengujian (JMC Role Switcher)',
+    subtitle: 'Beralih antara Admin Gudang (demo@merchant.id) dan Finance ERP (finance@merchant.id)',
+    badge: 'JMC Auth',
+    badgeVariant: 'indigo',
+    icon: UserCheck,
+    run: () => {
+      emit('update:open', false)
+      authStore.openAuthModal()
+    },
+  },
+  {
+    id: 'jmc-reset-data',
+    group: 'JMC Assessment & Demo',
+    title: 'Reset & Seed Demo State (Kembalikan Stok & Data Awal)',
+    subtitle: 'Pulihkan stok SKU-1 = 1 pcs dan pesanan sampel ke baseline pengujian awal',
+    badge: '1-Click Reset',
+    badgeVariant: 'amber',
+    icon: RotateCcw,
+    run: () => {
+      emit('update:open', false)
+      store.resetDemoState()
+    },
+  },
   {
     id: 'sim-ai',
     group: 'Simulasi Live & AI',

@@ -853,3 +853,46 @@ func (r *OMSRepository) ListSystemErrors(ctx context.Context, limit int) ([]doma
 	return logs, nil
 }
 
+// ResetAndSeedDemoState resets the core inventory, sample demo orders, and test logs
+// back to their pristine initial demo baseline for seamless evaluator testing.
+func (r *OMSRepository) ResetAndSeedDemoState(ctx context.Context) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	queries := []string{
+		// 1. Reset Merchant 1 Products to baseline (Kaos starts at 1 pcs for Flash Sale Demo)
+		`UPDATE products SET available_stock = 1, reserved_stock = 2, sold_stock = 48, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111101'`,
+		`UPDATE products SET available_stock = 24, reserved_stock = 1, sold_stock = 35, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111102'`,
+		`UPDATE products SET available_stock = 14, reserved_stock = 1, sold_stock = 62, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111103'`,
+		`UPDATE products SET available_stock = 18, reserved_stock = 0, sold_stock = 29, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111104'`,
+		`UPDATE products SET available_stock = 40, reserved_stock = 3, sold_stock = 91, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111105'`,
+		`UPDATE products SET available_stock = 5, reserved_stock = 1, sold_stock = 19, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111106'`,
+		// 2. Reset Merchant 2 Products
+		`UPDATE products SET available_stock = 12, reserved_stock = 1, sold_stock = 44, version = 1 WHERE id = 'a2222222-2222-2222-2222-222222222201'`,
+		`UPDATE products SET available_stock = 3, reserved_stock = 0, sold_stock = 27, version = 1 WHERE id = 'a2222222-2222-2222-2222-222222222202'`,
+		// 3. Reset standard demo orders to initial states
+		`UPDATE orders SET status = 'READY_TO_SHIP' WHERE id = 'b1111111-1111-1111-1111-111111111101'`,
+		`UPDATE orders SET status = 'PENDING_PAYMENT' WHERE id = 'b1111111-1111-1111-1111-111111111102'`,
+		`UPDATE orders SET status = 'PAID' WHERE id = 'b1111111-1111-1111-1111-111111111103'`,
+		`UPDATE orders SET status = 'PENDING_PAYMENT' WHERE id = 'b1111111-1111-1111-1111-111111111104'`,
+		`UPDATE orders SET status = 'COMPLETED' WHERE id = 'b1111111-1111-1111-1111-111111111105'`,
+		// 4. Reset sample proof verification status
+		`UPDATE payment_proofs SET status = 'VERIFIED' WHERE id = 'c1111111-1111-1111-1111-111111111101'`,
+		`UPDATE payment_proofs SET status = 'SUSPICIOUS_HOLD' WHERE id = 'c1111111-1111-1111-1111-111111111102'`,
+		// 5. Clean unresolved error logs for pristine state
+		`DELETE FROM system_error_logs WHERE resolved = TRUE`,
+	}
+
+	for _, q := range queries {
+		if _, err := tx.Exec(ctx, q); err != nil {
+			return fmt.Errorf("reset query error (%s): %w", q, err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+

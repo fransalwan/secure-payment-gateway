@@ -16,6 +16,7 @@ import {
   Table as TableIcon,
   RefreshCw,
   HelpCircle,
+  Download,
 } from '@lucide/vue'
 
 const questionInput = ref('Tampilkan omset dan total order per channel penjualan')
@@ -87,6 +88,39 @@ function copySQL() {
   setTimeout(() => {
     copied.value = false
   }, 2000)
+}
+
+function exportQueryResultCSV() {
+  if (!reportResult.value || !reportResult.value.rows || reportResult.value.rows.length === 0) {
+    toast.error('Tidak ada data hasil query untuk di-export')
+    return
+  }
+
+  const cols = reportResult.value.columns
+  const headers = cols.map((c) => `"${c.replace(/"/g, '""')}"`)
+  const rows = reportResult.value.rows.map((row) =>
+    cols
+      .map((col) => {
+        const val = row[col]
+        if (val === null || val === undefined) return '""'
+        if (typeof val === 'number') return val
+        return `"${String(val).replace(/"/g, '""')}"`
+      })
+      .join(','),
+  )
+
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.setAttribute('href', url)
+  link.setAttribute('download', `ai-query-result-${new Date().toISOString().slice(0, 10)}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+
+  toast.success('Hasil Query Berhasil Diexport ke CSV!')
 }
 </script>
 
@@ -222,12 +256,24 @@ function copySQL() {
       <!-- Tabular Data Display -->
       <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
         <div class="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
-            Hasil Eksekusi Kueri
-          </span>
-          <span class="text-xs font-mono text-slate-400">
-            Total {{ reportResult.rows.length }} Data
-          </span>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+              Hasil Eksekusi Kueri
+            </span>
+            <span class="text-xs font-mono text-slate-400">
+              ({{ reportResult.rows.length }} Baris Data)
+            </span>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            class="text-xs h-7 gap-1.5 font-semibold"
+            @click="exportQueryResultCSV"
+          >
+            <Download class="w-3.5 h-3.5 text-tone-emerald" />
+            <span>Export CSV</span>
+          </Button>
         </div>
 
         <div class="overflow-x-auto">

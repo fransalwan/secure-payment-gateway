@@ -118,3 +118,70 @@ Jika ingin pembaruan otomatis (*Continuous Deployment*) setiap kali kode lolos *
    cd ~/secure-payment-gateway && git pull origin main && ./scripts/deploy-vps.sh
    ```
 
+---
+
+## 7. Database Backup, Point-in-Time Recovery (PITR) & Maintenance Runbook
+
+> **Standar Kepatuhan Midle Programmer PT. Jiwa Muda Cipta Indonesia (JMC IT Consultant)**  
+> Prosedur pencadangan (*backup*), retensi berkala, dan pemulihan bencana (*disaster recovery*) untuk menjamin ketersediaan data transaksi finansial, buku besar berpasangan (*Double-Entry Ledger*), dan stok gudang tanpa risiko kehilangan data (*Zero Data Loss*).
+
+### 7.1 Otomatisasi Backup Harian via `scripts/backup-db.sh`
+Repositori menyediakan skrip shell teruji [`scripts/backup-db.sh`](../scripts/backup-db.sh) yang menjalankan `pg_dump` berformat biner terkompresi (`-F c`) langsung dari container PostgreSQL:
+
+```bash
+chmod +x scripts/backup-db.sh
+./scripts/backup-db.sh
+```
+
+**Fitur Skrip Backup:**
+- Menghasilkan file snapshot `.dump` berpelindung hak akses ketat (`chmod 600`).
+- Otomatis menghapus snapshot yang telah melewati masa retensi (default: **7 hari**) untuk menghemat kapasitas storage VPS.
+- Dapat dijadwalkan secara otomatis melalui Linux `crontab`:
+
+```bash
+# Tambahkan ke crontab root (crontab -e) untuk dieksekusi setiap pukul 02:00 WIB:
+0 2 * * * /root/secure-payment-gateway/scripts/backup-db.sh >> /var/log/spg-backup.log 2>&1
+```
+
+### 7.2 Prosedur Disaster Recovery & Restore Database (Uji Insiden)
+Ketika terjadi kegagalan server atau kerusakan data tidak disengaja, jalankan pemulihan cepat (*clean restore*) menggunakan utilitas `pg_restore`:
+
+```bash
+# 1. Pastikan container database aktif
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d postgres
+
+# 2. Eksekusi pg_restore dengan opsi --clean (menghapus objek lama sebelum membuat ulang)
+cat /var/backups/secure-payment-gateway/spg_backup_YYYYMMDD_HHMMSS.dump | \
+docker exec -i spg-postgres pg_restore \
+  -U postgres \
+  -d payment_gateway_db \
+  --clean \
+  --if-exists \
+  --verbose
+
+# 3. Verifikasi integritas tabel transaksi & stok produk
+docker exec -it spg-postgres psql -U postgres -d payment_gateway_db -c "
+  SELECT 'orders' AS table_name, count(*) AS total_records FROM orders
+  UNION ALL
+  SELECT 'products', count(*) FROM products
+  UNION ALL
+  SELECT 'ledger_entries', count(*) FROM ledger_entries;
+"
+```
+
+### 7.3 Konsep Point-in-Time Recovery (PITR) & WAL Archiving
+Untuk sistem produksi dengan SLA pemulihan data hingga ke tingkat menit sebelum insiden:
+1. Aktifkan penulisan Write-Ahead Log (*WAL Archiving*) pada `postgresql.conf`:
+   ```ini
+   wal_level = replica
+   archive_mode = on
+   archive_command = 'test ! -f /var/lib/postgresql/wal_archive/%f && cp %p /var/lib/postgresql/wal_archive/%f'
+   archive_timeout = 60
+   ```
+2. Saat terjadi insiden pada jam `14:32:00`, database dapat dipulihkan hingga jam `14:30:00` dengan mengombinasikan snapshot backup terakhir ditambah pemutaran ulang segmen WAL melalui file instruksi `recovery.signal`:
+   ```ini
+   restore_command = 'cp /var/lib/postgresql/wal_archive/%f %p'
+   recovery_target_time = '2026-11-14 14:30:00+07'
+   ```
+
+

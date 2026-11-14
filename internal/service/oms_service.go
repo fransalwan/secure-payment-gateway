@@ -755,3 +755,9 @@ func (s *OMSService) GetDashboardOverview(
 	}, nil
 }
 
+// ResetDemoState restores all demo products and standard orders back to initial seed baseline.
+func (s *OMSService) ResetDemoState(ctx context.Context) error {
+	return s.omsRepo.ResetAndSeedDemoState(ctx)
+}
+
+

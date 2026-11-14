@@ -222,6 +222,8 @@ func main() {
 		r.Post("/simulator/race-condition", omsHandler.SimulateRaceCondition)
 		r.Post("/simulator/duplicate-webhook", omsHandler.SimulateDuplicateWebhook)
 		r.Post("/simulator/chaos-mode", omsHandler.SetChaosMode)
+		r.Post("/simulator/reset-demo", omsHandler.ResetDemoState)
+		r.Post("/dashboard/reset-demo", omsHandler.ResetDemoState)
 		r.Post("/queue/jobs/{id}/retry", omsHandler.ManualRetryJob)
 
 		// --- Core Payment Gateway & Double-Entry Ledger Endpoints ---

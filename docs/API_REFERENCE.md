@@ -171,6 +171,21 @@ Mengubah mode simulasi kegagalan API pihak ketiga pada worker logistik dan sinkr
 ```
 *(Nilai valid: `"OFF"`, `"TRANSIENT_TWICE"`, `"ALWAYS_429"`)*
 
+### `POST /api/v1/simulator/reset-demo`
+Mengembalikan (*rollback & seed*) seluruh stok produk (SKU-1 menjadi 1 pcs untuk pengujian flash sale), pesanan sampel, dan membersihkan log sistem kembali ke baseline awal pengujian.
+
+* **Response (`200 OK`)**:
+```json
+{
+  "success": true,
+  "message": "Demo state successfully reset and seeded to initial baseline",
+  "data": {
+    "reset_at": "2026-11-14T04:00:00Z",
+    "status": "READY"
+  }
+}
+```
+
 ### `POST /api/v1/queue/jobs/{id}/retry`
 Mereset penghitung kegagalan job berstatus `FAILED` (DLQ) dan memasukkannya kembali ke antrean aktif.
 

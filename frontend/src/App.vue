@@ -18,6 +18,8 @@ import OrderInspectorSheet from './components/OrderInspectorSheet.vue'
 import PaymentSlipModal from './components/PaymentSlipModal.vue'
 import AiReportingPanel from './components/AiReportingPanel.vue'
 import AiTelemetryPanel from './components/AiTelemetryPanel.vue'
+import DemoLoginModal from './components/DemoLoginModal.vue'
+import { useAuthStore } from './stores/authStore'
 import type { Order } from './types/oms'
 import {
   LayoutGrid,
@@ -36,11 +38,14 @@ import {
   UploadCloud,
   Coins,
   Camera,
+  User,
+  RotateCcw,
 } from '@lucide/vue'
 
 type WorkspaceView = 'overview' | NavSection | 'telemetry'
 
 const store = useOmsStore()
+const authStore = useAuthStore()
 const { resolvedTheme, toggleOppositeScheme } = useThemeScheme()
 
 const activeView = ref<WorkspaceView>('overview')
@@ -341,8 +346,46 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Right: Search/Command Launcher, Live Latency, Theme, Sync -->
+          <!-- Right: Search/Command Launcher, Live Latency, Theme, Sync, Demo User -->
           <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <!-- Active Demo User Chip & Role Switcher (JMC Technical Evaluation Gate) -->
+            <button
+              type="button"
+              @click="authStore.openAuthModal"
+              class="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl border border-border bg-elevated hover:bg-muted px-2 sm:px-2.5 py-1.5 text-xs transition cursor-pointer text-left"
+              title="Klik untuk beralih akun demo pengujian JMC (Admin Gudang vs Finance ERP)"
+            >
+              <div
+                class="w-5 h-5 rounded-md flex items-center justify-center text-xs font-black shrink-0"
+                :class="authStore.isAdmin ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-400'"
+              >
+                <User class="w-3.5 h-3.5" />
+              </div>
+              <div class="hidden sm:block leading-tight min-w-0">
+                <div class="text-[11px] font-bold text-foreground truncate max-w-[125px]">
+                  {{ authStore.currentUser.email }}
+                </div>
+                <div class="text-[9px] text-muted-foreground truncate max-w-[125px]">
+                  {{ authStore.isAdmin ? 'Admin Toko' : 'Finance ERP' }}
+                </div>
+              </div>
+              <Badge :variant="authStore.currentUser.badgeVariant" class="text-[9px] px-1.5 py-0 font-mono hidden md:inline-flex">
+                Ganti Akun
+              </Badge>
+            </button>
+
+            <!-- Reset Demo State Button (1-Click Recovery for JMC Evaluators) -->
+            <Button
+              variant="outline"
+              size="sm"
+              class="hidden md:inline-flex text-xs font-semibold text-tone-amber border-amber-500/30 hover:bg-amber-500/10"
+              title="Reset stok inventori (SKU-1 = 1 pcs) dan order ke baseline awal pengujian"
+              @click="store.resetDemoState()"
+            >
+              <RotateCcw class="w-3.5 h-3.5 mr-1" :class="store.isLoading ? 'animate-spin' : ''" />
+              <span>Reset Data</span>
+            </Button>
+
             <!-- Command & Simulation Palette Trigger -->
             <button
               type="button"
@@ -408,10 +451,19 @@ onUnmounted(() => {
                 <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
               <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">
-                Recruiter &amp; Tech Lead Guided Sandbox (1-Click Demos)
+                JMC Assessment &amp; Tech Lead Guided Sandbox (1-Click Demos)
               </span>
             </div>
-            <span class="text-[11px] text-muted-foreground font-medium">Target: Software Engineer (AI) / FinTech Backend</span>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] text-muted-foreground font-medium hidden sm:inline">Kredensial: demo@merchant.id / DemoJMC2026!</span>
+              <button
+                type="button"
+                @click="authStore.openAuthModal"
+                class="text-[11px] font-bold text-tone-emerald hover:underline cursor-pointer"
+              >
+                Ganti Role &rarr;
+              </button>
+            </div>
           </div>
 
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -618,5 +670,6 @@ onUnmounted(() => {
       @print-waybill="openWaybillModal"
       @verify-slip="onVerifySlipFromInspector"
     />
+    <DemoLoginModal />
   </div>
 </template>

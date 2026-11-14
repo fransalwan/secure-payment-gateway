@@ -14,7 +14,10 @@ import {
   Copy,
   Check,
   Search,
+  Download,
+  FileSpreadsheet,
 } from '@lucide/vue'
+import { toast } from 'vue-sonner'
 import { ref, computed } from 'vue'
 
 const emit = defineEmits<{
@@ -104,6 +107,175 @@ async function copyAwb(awb: string) {
     if (copiedAwb.value === awb) copiedAwb.value = ''
   }, 1800)
 }
+
+function exportOrdersCSV() {
+  if (visibleOrders.value.length === 0) {
+    toast.error('Tidak Ada Data untuk Di-export', {
+      description: 'Filter saat ini tidak menghasilkan pesanan.',
+    })
+    return
+  }
+
+  const headers = [
+    'No Order',
+    'Kanal',
+    'Tanggal Transaksi',
+    'Nama Pelanggan',
+    'No Telepon',
+    'Alamat Pengiriman',
+    'Kurir',
+    'Total Nominal (IDR)',
+    'Status Pesanan',
+    'No Resi Waybill',
+  ]
+
+  const rows = visibleOrders.value.map((o) => [
+    `"${o.order_number}"`,
+    `"${o.channel}"`,
+    `"${new Date(o.created_at).toLocaleString('id-ID')}"`,
+    `"${(o.customer_name || '').replace(/"/g, '""')}"`,
+    `"${o.customer_phone || ''}"`,
+    `"${(o.shipping_address || '').replace(/"/g, '""')}"`,
+    `"${o.courier_code || ''}"`,
+    o.total_amount,
+    `"${o.status}"`,
+    `"${o.waybill_number || '-'}"`,
+  ])
+
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  const dateStr = new Date().toISOString().slice(0, 10)
+  link.setAttribute('href', url)
+  link.setAttribute('download', `rekap-pesanan-oms-${dateStr}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+
+  toast.success('File CSV Berhasil Diunduh', {
+    description: `${visibleOrders.value.length} pesanan berhasil diexport ke format CSV.`,
+  })
+}
+
+function printOrdersReport() {
+  if (visibleOrders.value.length === 0) {
+    toast.error('Tidak Ada Data untuk Dicetak', {
+      description: 'Filter saat ini tidak menghasilkan pesanan.',
+    })
+    return
+  }
+
+  const printWindow = window.open('', '_blank')
+  if (!printWindow) {
+    toast.error('Gagal Membuka Jendela Cetak', {
+      description: 'Izinkan pop-up pada browser Anda.',
+    })
+    return
+  }
+
+  const totalNominal = visibleOrders.value.reduce((sum, o) => sum + o.total_amount, 0)
+  const merchantName = store.activeMerchant?.name || 'PT Toko Maju Omni-Retail'
+  const merchantCode = store.activeMerchant?.code || 'MID-8801'
+  const filterDesc = `${store.channelFilter || 'Semua Kanal'} | ${store.statusFilter || 'Semua Status'}`
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Laporan Rekapitulasi Pesanan - ${merchantCode}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 30px; color: #111; font-size: 12px; }
+    .header { border-bottom: 2px solid #222; padding-bottom: 12px; margin-bottom: 16px; }
+    .title { font-size: 16px; font-weight: bold; text-transform: uppercase; margin: 0; }
+    .sub { color: #555; font-size: 11px; margin-top: 4px; }
+    .meta-box { display: flex; justify-content: space-between; background: #f7f7f7; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th { background: #eee; text-align: left; padding: 8px; font-size: 10px; text-transform: uppercase; border-bottom: 1px solid #ccc; }
+    td { padding: 7px 8px; border-bottom: 1px solid #e5e5e5; font-size: 11px; }
+    .text-right { text-align: right; }
+    .font-mono { font-family: monospace; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; background: #e0e0e0; }
+    .total-row { font-weight: bold; background: #fafafa; }
+    .footer { margin-top: 30px; font-size: 10px; color: #777; text-align: right; border-top: 1px solid #eee; padding-top: 8px; }
+    @media print {
+      body { margin: 15mm; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">${merchantName} (${merchantCode})</div>
+    <div class="sub">Sistem Informasi Omni-Channel OMS &amp; Secure Settlement — Laporan Rekapitulasi Pesanan</div>
+  </div>
+
+  <div class="meta-box">
+    <div>
+      <div><strong>Filter:</strong> ${filterDesc}</div>
+      <div><strong>Tanggal Cetak:</strong> ${new Date().toLocaleString('id-ID')}</div>
+    </div>
+    <div class="text-right">
+      <div><strong>Total Pesanan:</strong> ${visibleOrders.value.length} Data</div>
+      <div><strong>Total Akumulasi:</strong> ${formatIDR(totalNominal)}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>No.</th>
+        <th>No. Order</th>
+        <th>Kanal</th>
+        <th>Pelanggan</th>
+        <th>Kurir</th>
+        <th class="text-right">Total (IDR)</th>
+        <th>Status</th>
+        <th>Waybill / Resi</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${visibleOrders.value
+        .map(
+          (o, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td class="font-mono font-bold">${o.order_number}</td>
+          <td>${o.channel}</td>
+          <td>${o.customer_name}</td>
+          <td>${o.courier_code || '-'}</td>
+          <td class="text-right font-mono">${formatIDR(o.total_amount)}</td>
+          <td><span class="badge">${o.status}</span></td>
+          <td class="font-mono">${o.waybill_number || '-'}</td>
+        </tr>`,
+        )
+        .join('')}
+      <tr class="total-row">
+        <td colspan="5" class="text-right">TOTAL KESELURUHAN</td>
+        <td class="text-right font-mono">${formatIDR(totalNominal)}</td>
+        <td colspan="2"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Dicetak melalui Antarmuka ERP OMS PT Toko Maju Omni-Retail — Dokumen Resmi Penilaian Teknis JMC IT Consultant
+  </div>
+
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+      }, 300);
+    };
+  <\/script>
+</body>
+</html>`
+
+  printWindow.document.write(html)
+  printWindow.document.close()
+}
 </script>
 
 <template>
@@ -122,10 +294,22 @@ async function copyAwb(awb: string) {
         </p>
       </div>
 
-      <Button variant="emerald" class="w-full sm:w-auto" @click="emit('openAiParser')">
-        <Sparkles class="w-3.5 h-3.5" />
-        <span>+ AI WhatsApp Order Capture</span>
-      </Button>
+      <div class="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" class="text-xs font-semibold" @click="exportOrdersCSV">
+          <Download class="w-3.5 h-3.5 mr-1 text-tone-emerald" />
+          <span>Export CSV</span>
+        </Button>
+
+        <Button variant="outline" size="sm" class="text-xs font-semibold" @click="printOrdersReport">
+          <Printer class="w-3.5 h-3.5 mr-1 text-tone-indigo" />
+          <span>Cetak PDF</span>
+        </Button>
+
+        <Button variant="emerald" size="sm" class="w-full sm:w-auto text-xs font-semibold" @click="emit('openAiParser')">
+          <Sparkles class="w-3.5 h-3.5" />
+          <span>+ AI WhatsApp Order Capture</span>
+        </Button>
+      </div>
     </div>
 
     <!-- Mobile-First Swipeable Filter Chips & Search Toolbar -->

@@ -36,6 +36,7 @@ Repositori ini dilengkapi dokumentasi teknis terstruktur untuk mempermudah *onbo
 | :--- | :--- |
 | **[`docs/ARCHITECTURE_AND_HANDOVER.md`](docs/ARCHITECTURE_AND_HANDOVER.md)** | Peta modul (*codebase map*), 5 *System Invariants ("Do Not Break" Rules)*, diagram ER & sekuens, *playbooks* penambahan fitur baru, serta *troubleshooting runbook*. |
 | **[`docs/API_REFERENCE.md`](docs/API_REFERENCE.md)** | Spesifikasi kontrak REST API lengkap (request/response JSON, header keamanan HMAC, kode status HTTP `200`/`201`/`401`/`409`). |
+| **[`CHANGELOG.md`](CHANGELOG.md)** | Catatan riwayat rilis terstruktur berbasis SemVer (`v1.0.0` s/d `v1.3.0` JMC Assessment Release). |
 | **[`AI_WORKFLOW.md`](AI_WORKFLOW.md)** | Standar kerja *Spec-First AI Engineering*, dekomposisi task, *prompt template*, dan *Pre-Merge Review Checklist*. |
 
 ---
@@ -126,6 +127,7 @@ Repositori ini dilengkapi dokumentasi teknis terstruktur untuk mempermudah *onbo
 | `POST` | `/api/v1/simulator/race-condition` | Menjalankan simulasi `N` pembeli konkuren yang memperebutkan 1 stok terakhir secara simultan. |
 | `POST` | `/api/v1/simulator/duplicate-webhook` | Menembakkan 5 webhook identik beruntun untuk membuktikan deduplikasi idempotent. |
 | `POST` | `/api/v1/simulator/chaos-mode` | Mengatur simulasi kegagalan API logistik pihak ketiga (`OFF`, `TRANSIENT_TWICE`, `ALWAYS_429`) untuk menguji *Exponential Backoff* & DLQ. |
+| `POST` | `/api/v1/simulator/reset-demo` | Mengembalikan stok produk (`SKU-1 = 1 pcs`), pesanan sampel, dan antrean ke baseline awal pengujian JMC (1-click recovery). |
 | `POST` | `/api/v1/queue/jobs/{id}/retry` | Melakukan *Manual Retry* atas job yang berada di status `FAILED / DLQ`. |
 | `POST` | `/api/v1/transfers` | Transfer dana atomik *Double-Entry Ledger* berproteksi `HMAC-SHA256` & Redis Idempotency Lock. |
 | `POST` | `/api/v1/reconciliation/upload` | Pencocokan mutasi bank *3-Way Settlement Reconciliation* berbasis CSV stream. |
@@ -163,14 +165,20 @@ go run ./cmd/api
 ```
 Akses **Operational Dashboard & Simulator UI** di `http://localhost:8080`.
 
-### 6. Live Remote Demo via Public Tunnel
+### 6. Kredensial Akun Demo Pengujian (Evaluation Sandbox)
+Aplikasi telah dilengkapi fitur **Role Switcher** dan dua akun demo resmi untuk keperluan pengujian teknis:
+* **Akun 1 (Admin Gudang & OMS)**: `demo@merchant.id` | Password: `DemoJMC2026!`
+* **Akun 2 (Finance & ERP Accounting)**: `finance@merchant.id` | Password: `DemoJMC2026!`
+* **1-Click Demo Recovery**: Klik tombol **"Reset Data"** di pojok kanan atas UI atau jalankan `POST /api/v1/simulator/reset-demo` untuk mengembalikan seluruh stok produk ke kondisi baseline awal.
+
+### 7. Live Remote Demo via Public Tunnel
 ```bash
 make tunnel
 # Atau di PowerShell:
 .\scripts\tunnel.ps1
 ```
 
-### 7. Production Multi-Container Deployment (Docker Compose + Auto-HTTPS Caddy)
+### 8. Production Multi-Container Deployment (Docker Compose + Auto-HTTPS Caddy)
 Repository ini sudah dilengkapi [`Dockerfile`](Dockerfile) *multi-stage* (Node 22 + Go Alpine + *non-root runtime*), [`docker-compose.prod.yml`](docker-compose.prod.yml) dengan pemisahan container `oms-api` (`ENABLE_EMBEDDED_WORKER=false`) dan `oms-worker`, serta reverse proxy `Caddy` untuk HTTPS otomatis:
 
 ```bash

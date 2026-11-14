@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/fransalwan/secure-payment-gateway/internal/domain"
 	postgresrepo "github.com/fransalwan/secure-payment-gateway/internal/repository/postgres"
@@ -257,4 +258,18 @@ func (h *OMSHandler) GetDashboardOverview(w http.ResponseWriter, r *http.Request
 
 	response.OK(w, "Operational OMS dashboard overview fetched", overview)
 }
+
+// ResetDemoState handles POST /api/v1/simulator/reset-demo and POST /api/v1/dashboard/reset-demo
+func (h *OMSHandler) ResetDemoState(w http.ResponseWriter, r *http.Request) {
+	if err := h.omsService.ResetDemoState(r.Context()); err != nil {
+		response.InternalServerError(w, "failed to reset demo state: "+err.Error())
+		return
+	}
+
+	response.OK(w, "Demo state successfully reset and seeded to initial baseline", map[string]interface{}{
+		"reset_at": time.Now().UTC().Format(time.RFC3339),
+		"status":   "READY",
+	})
+}
+
 
