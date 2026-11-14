@@ -126,6 +126,7 @@ services:
 
   oms-worker:
     image: spg-oms:latest
+    pull_policy: never
     container_name: spg-prod-worker
     restart: unless-stopped
     command: ["/app/spg-worker"]
