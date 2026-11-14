@@ -28,14 +28,14 @@ if ! command -v docker >/dev/null 2>&1; then
   sudo usermod -aG docker "$USER" || true
 fi
 
-echo "==> [2/4] Preparing production environment ($ENV_FILE)..."
+echo "==> [3/5] Preparing production environment ($ENV_FILE)..."
 if [ ! -f "$ENV_FILE" ]; then
-  AES_KEY="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
-  DB_PASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
-  REDIS_PASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
-  RABBIT_PASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
-  HMAC_KEY="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
-  WEBHOOK_KEY="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
+  AES_KEY="$(openssl rand -hex 16)"
+  DB_PASS="$(openssl rand -hex 12)"
+  REDIS_PASS="$(openssl rand -hex 12)"
+  RABBIT_PASS="$(openssl rand -hex 12)"
+  HMAC_KEY="$(openssl rand -hex 16)"
+  WEBHOOK_KEY="$(openssl rand -hex 16)"
 
   cat > "$ENV_FILE" <<EOF
 APP_DOMAIN=${DOMAIN_ARG:-:80}
