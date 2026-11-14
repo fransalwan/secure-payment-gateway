@@ -182,6 +182,11 @@ func main() {
 	r.Get("/health", healthHandler)
 	r.Head("/health", healthHandler)
 
+	// Interactive OpenAPI 3.0 / Swagger UI Documentation Portal
+	r.Get("/api/docs", httphandler.ServeAPIDocs)
+	r.Get("/api/docs/", httphandler.ServeAPIDocs)
+	r.Get("/api/openapi.json", httphandler.ServeOpenAPISpec)
+
 	// Serve Vue 3 + TypeScript + Pinia Operational Dashboard (web/dist)
 	distDir := filepath.Join("web", "dist")
 	assetsDir := filepath.Join(distDir, "assets")
