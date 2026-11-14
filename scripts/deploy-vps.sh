@@ -11,7 +11,17 @@ set -euo pipefail
 DOMAIN_ARG="${1:-}"
 ENV_FILE=".env.prod"
 
-echo "==> [1/4] Checking Docker & Docker Compose availability..."
+echo "==> [1/5] Ensuring 2GB Swap File is active (prevents OOM on 1-2GB RAM VPS)..."
+if [ "$(swapon --show | wc -l)" -eq 0 ] && [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  echo "    Created and activated 2GB /swapfile."
+fi
+
+echo "==> [2/5] Checking Docker & Docker Compose availability..."
 if ! command -v docker >/dev/null 2>&1; then
   echo "    Docker not found. Installing official Docker Engine..."
   curl -fsSL https://get.docker.com | sh

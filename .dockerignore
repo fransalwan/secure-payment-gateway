@@ -18,10 +18,9 @@ bin/
 !.env.example
 !.env.prod.example
 
-# Frontend node_modules & prebuilt dist (rebuilt freshly in Stage 1)
-frontend/node_modules/
+# Frontend source & node_modules (prebuilt web/dist is committed and copied directly)
+frontend/
 *.tsbuildinfo
-web/dist/
 
 # IDE, OS & local notes
 .idea/

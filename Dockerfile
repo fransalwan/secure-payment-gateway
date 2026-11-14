@@ -1,25 +1,13 @@
 # ==============================================================================
-# Stage 1: Build Mobile-First Vue 3 + TypeScript + shadcn-vue (Reka UI) SPA
-# ==============================================================================
-FROM node:22-alpine AS frontend-builder
-
-WORKDIR /build/frontend
-
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
-
-COPY frontend/ ./
-# vite.config.ts outputs compiled bundle directly to ../web/dist (/build/web/dist)
-RUN npm run build
-
-# ==============================================================================
-# Stage 2: Build Go API Server & Standalone Redis/Outbox Background Worker
+# Stage 1: Build Go API Server & Standalone Redis/Outbox Background Worker
+# (Frontend SPA is pre-built in web/dist to avoid OOM on 1-2GB RAM Cloud VPS)
 # ==============================================================================
 FROM golang:alpine AS backend-builder
 
 ENV CGO_ENABLED=0 \
     GOOS=linux \
-    GOTOOLCHAIN=auto
+    GOTOOLCHAIN=auto \
+    GOGC=50
 
 WORKDIR /src
 
@@ -30,11 +18,11 @@ COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 COPY pkg/ ./pkg/
 
-RUN go build -trimpath -ldflags="-s -w" -o /out/spg-api ./cmd/api \
-    && go build -trimpath -ldflags="-s -w" -o /out/spg-worker ./cmd/worker
+RUN go build -p 2 -trimpath -ldflags="-s -w" -o /out/spg-api ./cmd/api \
+    && go build -p 2 -trimpath -ldflags="-s -w" -o /out/spg-worker ./cmd/worker
 
 # ==============================================================================
-# Stage 3: Minimal Hardened Production Runtime (Alpine + Non-Root User)
+# Stage 2: Minimal Hardened Production Runtime (Alpine + Non-Root User)
 # ==============================================================================
 FROM alpine:3.21 AS runtime
 
@@ -50,7 +38,7 @@ WORKDIR /app
 
 COPY --from=backend-builder /out/spg-api /app/spg-api
 COPY --from=backend-builder /out/spg-worker /app/spg-worker
-COPY --from=frontend-builder /build/web/dist /app/web/dist
+COPY web/dist /app/web/dist
 COPY migrations/ /app/migrations/
 
 RUN chown -R spg:spg /app
