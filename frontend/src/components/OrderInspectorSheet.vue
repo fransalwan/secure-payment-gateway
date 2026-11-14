@@ -194,6 +194,30 @@ async function handleCancel() {
         </div>
       </div>
 
+      <!-- Human-in-the-Loop Fraud Investigation & Resolution Card -->
+      <div
+        v-if="order.status === 'SUSPICIOUS_HOLD'"
+        class="rounded-xl border border-rose-500/40 bg-rose-950/20 p-4 space-y-3"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <Badge variant="rose">HUMAN-IN-THE-LOOP FRAUD HOLD</Badge>
+          <span class="font-mono text-[10px] text-tone-rose font-bold">Stok Terkunci di Reserved</span>
+        </div>
+        <p class="text-[11px] text-secondary-foreground leading-relaxed">
+          Multimodal Vision AI menahan transaksi ini karena terdeteksi indikasi manipulasi piksel struk atau ketidaksesuaian nominal transfer. Pilih tindakan resolusi:
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          <Button variant="emerald" size="sm" class="w-full font-semibold" @click="handleSimulatePay">
+            <Check class="w-3.5 h-3.5" />
+            <span>Approve Override &rarr; PAID</span>
+          </Button>
+          <Button variant="destructive" size="sm" class="w-full font-semibold" @click="handleCancel">
+            <XCircle class="w-3.5 h-3.5" />
+            <span>Reject Fraud &amp; Rilis Stok</span>
+          </Button>
+        </div>
+      </div>
+
       <!-- Primary Operational Actions (Thumb-Friendly Full Width on Mobile) -->
       <div v-if="order.status === 'PENDING_PAYMENT' || order.status === 'SUSPICIOUS_HOLD'" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
         <Button variant="emerald" size="lg" class="w-full sm:col-span-2" @click="emit('verifySlip', order)">
@@ -202,11 +226,11 @@ async function handleCancel() {
         </Button>
         <Button variant="indigo" size="lg" class="w-full" @click="handleSimulatePay">
           <CreditCard class="w-4 h-4" />
-          <span>Simulasi Bayar (HMAC Webhook)</span>
+          <span>{{ order.status === 'SUSPICIOUS_HOLD' ? 'Override ke PAID' : 'Simulasi Bayar (HMAC Webhook)' }}</span>
         </Button>
         <Button variant="destructive" size="lg" class="w-full" @click="handleCancel">
           <XCircle class="w-4 h-4" />
-          <span>Batalkan &amp; Lepas Stok</span>
+          <span>{{ order.status === 'SUSPICIOUS_HOLD' ? 'Tolak Fraud & Rilis Stok' : 'Batalkan & Lepas Stok' }}</span>
         </Button>
       </div>
     </div>

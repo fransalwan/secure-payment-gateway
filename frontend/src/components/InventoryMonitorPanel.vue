@@ -2,11 +2,13 @@
 import Button from './ui/Button.vue'
 import Badge from './ui/Badge.vue'
 import { useOmsStore } from '../stores/omsStore'
+import { useAuthStore } from '../stores/authStore'
 import { formatIDR } from '../lib/utils'
 import type { Product } from '../types/oms'
-import { Boxes, Flame, Plus } from '@lucide/vue'
+import { Boxes, Flame, Plus, Lock } from '@lucide/vue'
 
 const store = useOmsStore()
+const authStore = useAuthStore()
 
 function stockTotal(p: Product) {
   return Math.max(1, p.available_stock + p.reserved_stock + p.sold_stock)
@@ -120,7 +122,7 @@ function pct(val: number, total: number) {
             </td>
 
             <td class="px-4 py-3 text-right">
-              <div class="flex sm:inline-flex items-center justify-end gap-1.5 w-full sm:w-auto">
+              <div v-if="authStore.isAdmin" class="flex sm:inline-flex items-center justify-end gap-1.5 w-full sm:w-auto">
                 <Button
                   variant="outline"
                   size="sm"
@@ -140,6 +142,17 @@ function pct(val: number, total: number) {
                   <Plus class="w-3.5 h-3.5" />
                   <span>10</span>
                 </Button>
+              </div>
+              <div v-else class="inline-flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  @click="authStore.openAuthModal"
+                  class="inline-flex items-center gap-1 rounded-lg border border-border bg-elevated px-2.5 py-1 text-[10px] font-mono text-muted-foreground hover:text-foreground cursor-pointer"
+                  title="Mutasi stok dikunci untuk role FINANCE_AUDITOR. Klik untuk beralih ke MERCHANT_ADMIN."
+                >
+                  <Lock class="w-3 h-3 text-tone-indigo" />
+                  <span>Read-Only (Finance RBAC)</span>
+                </button>
               </div>
             </td>
           </tr>

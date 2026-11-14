@@ -3,12 +3,15 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/fransalwan/secure-payment-gateway/internal/domain"
 	"github.com/fransalwan/secure-payment-gateway/internal/repository/postgres"
 	"github.com/fransalwan/secure-payment-gateway/internal/service"
 	"github.com/fransalwan/secure-payment-gateway/pkg/response"
+	"github.com/google/uuid"
 )
 
 type TransferHandler struct {
@@ -70,5 +73,41 @@ func (h *TransferHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) 
 	}
 	response.OK(w, "audit logs retrieved successfully", logs)
 }
+
+// SimulateSettlementTransfer handles POST /api/v1/simulator/ledger-transfer
+// Executes a real ACID Double-Entry transfer with deterministic lock ordering & SHA-256 hash-chained audit log.
+func (h *TransferHandler) SimulateSettlementTransfer(w http.ResponseWriter, r *http.Request) {
+	var req domain.TransferRequestDTO
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	if req.SourceAccountID == uuid.Nil {
+		req.SourceAccountID = uuid.MustParse("e0000000-0000-0000-0000-000000000001") // ACC-ESCROW-GATEWAY
+	}
+	if req.DestinationAccountID == uuid.Nil {
+		req.DestinationAccountID = uuid.MustParse("e1111111-1111-1111-1111-111111111111") // ACC-MERCH-8801
+	}
+	if req.Amount <= 0 {
+		req.Amount = 275000
+	}
+	if req.Currency == "" {
+		req.Currency = "IDR"
+	}
+	if req.ReferenceID == "" {
+		req.ReferenceID = fmt.Sprintf("REF-BCA-SIM-%d", time.Now().Unix()%100000)
+	}
+	if req.Description == "" {
+		req.Description = "Simulated Instant Escrow -> Merchant Settlement Transfer"
+	}
+
+	idemKey := fmt.Sprintf("idem-sim-%s", req.ReferenceID)
+	result, err := h.svc.TransferFunds(r.Context(), &req, idemKey)
+	if err != nil {
+		response.BadRequest(w, "simulated double-entry transfer failed", "TRANSFER_SIM_FAILED", err.Error())
+		return
+	}
+
+	response.OK(w, "Atomic Double-Entry transfer & SHA-256 hash-chained audit log recorded", result)
+}
+
 
 

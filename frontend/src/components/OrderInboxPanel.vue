@@ -42,6 +42,7 @@ const channels = [
 const statuses = [
   { value: '', label: 'Semua Status' },
   { value: 'PENDING_PAYMENT', label: 'Pending Payment' },
+  { value: 'SUSPICIOUS_HOLD', label: 'Suspicious Hold (Fraud Review)' },
   { value: 'PAID', label: 'Paid (Processing AWB)' },
   { value: 'READY_TO_SHIP', label: 'Ready to Ship' },
   { value: 'CANCELLED', label: 'Cancelled' },
@@ -93,6 +94,7 @@ function statusVariant(st: string): 'emerald' | 'indigo' | 'amber' | 'rose' | 'd
       return 'indigo'
     case 'PENDING_PAYMENT':
       return 'amber'
+    case 'SUSPICIOUS_HOLD':
     case 'CANCELLED':
       return 'rose'
     default:
@@ -464,14 +466,24 @@ function printOrdersReport() {
                   <span>Bayar (Webhook)</span>
                 </Button>
                 <Button
-                  v-if="ord.status === 'PENDING_PAYMENT'"
+                  v-if="ord.status === 'SUSPICIOUS_HOLD'"
+                  variant="emerald"
+                  size="sm"
+                  class="flex-1 sm:flex-none"
+                  @click="store.simulatePayOrder(ord.id)"
+                >
+                  <Check class="w-3.5 h-3.5" />
+                  <span>Approve Override</span>
+                </Button>
+                <Button
+                  v-if="ord.status === 'PENDING_PAYMENT' || ord.status === 'SUSPICIOUS_HOLD'"
                   variant="destructive"
                   size="sm"
                   class="flex-1 sm:flex-none"
                   @click="store.cancelOrder(ord.id)"
                 >
                   <XCircle class="w-3.5 h-3.5" />
-                  <span>Batal</span>
+                  <span>{{ ord.status === 'SUSPICIOUS_HOLD' ? 'Tolak Fraud' : 'Batal' }}</span>
                 </Button>
                 <Button
                   v-if="ord.status === 'READY_TO_SHIP' || ord.waybill_number"

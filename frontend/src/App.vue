@@ -19,6 +19,7 @@ import PaymentSlipModal from './components/PaymentSlipModal.vue'
 import AiReportingPanel from './components/AiReportingPanel.vue'
 import AiTelemetryPanel from './components/AiTelemetryPanel.vue'
 import DemoLoginModal from './components/DemoLoginModal.vue'
+import ExecutiveOverviewPanel from './components/ExecutiveOverviewPanel.vue'
 import { useAuthStore } from './stores/authStore'
 import type { Order } from './types/oms'
 import {
@@ -60,7 +61,7 @@ const slipModalRef = ref<InstanceType<typeof PaymentSlipModal> | null>(null)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const headingIdByView: Record<WorkspaceView, string> = {
-  overview: 'unified-order-inbox-caption',
+  overview: 'executive-overview-heading',
   orders: 'unified-order-inbox-caption',
   inventory: 'inventory-monitor-caption',
   lab: 'stress-lab-heading',
@@ -442,26 +443,31 @@ onUnmounted(() => {
 
       <!-- Main Workspace Container (Extra bottom padding on mobile for fixed Bottom Tab Bar) -->
       <main class="flex-1 w-full max-w-7xl mx-auto px-3.5 sm:px-6 py-4 sm:py-6 pb-24 lg:pb-8 space-y-5">
-        <!-- RECRUITER & TECH LEAD QUICK LAUNCHER BAR -->
-        <div class="p-4 rounded-2xl border border-indigo-500/25 bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-background shadow-xs">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
-            <div class="flex items-center gap-2">
+        <!-- RECRUITER & TECH LEAD QUICK LAUNCHER BAR + RBAC CONTEXT -->
+        <div class="p-4 rounded-2xl border border-indigo-500/25 bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-background shadow-xs space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div class="flex items-center gap-2 flex-wrap">
               <span class="relative flex h-2 w-2">
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
               <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">
-                JMC Assessment &amp; Tech Lead Guided Sandbox (1-Click Demos)
+                Live Architecture &amp; Assessment Sandbox
               </span>
+              <Badge :variant="authStore.isAdmin ? 'emerald' : 'indigo'" class="font-mono text-[10px]">
+                RBAC: {{ authStore.currentUser.role }}
+              </Badge>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-[11px] text-muted-foreground font-medium hidden sm:inline">Kredensial: demo@merchant.id / DemoJMC2026!</span>
+              <span class="text-[11px] text-muted-foreground font-medium hidden sm:inline">
+                {{ authStore.isAdmin ? 'Akses Penuh: Mutasi Stok Gudang, Order & Chaos Sim' : 'Akses Auditor: Rekonsiliasi Ledger, Fraud Override & BI' }}
+              </span>
               <button
                 type="button"
                 @click="authStore.openAuthModal"
                 class="text-[11px] font-bold text-tone-emerald hover:underline cursor-pointer"
               >
-                Ganti Role &rarr;
+                Ganti Role ({{ authStore.isAdmin ? 'Ke Finance' : 'Ke Admin' }}) &rarr;
               </button>
             </div>
           </div>
@@ -491,7 +497,7 @@ onUnmounted(() => {
               </div>
               <div class="min-w-0">
                 <div class="text-xs font-bold text-foreground truncate">2. Text-to-SQL BI</div>
-                <div class="text-[10px] text-muted-foreground truncate">Semantic Metrics &amp; AST Safe</div>
+                <div class="text-[10px] text-muted-foreground truncate">Visual Chart &amp; AST Safe</div>
               </div>
             </button>
 
@@ -511,15 +517,15 @@ onUnmounted(() => {
 
             <button
               type="button"
-              @click="switchView('telemetry')"
+              @click="switchView('ledger')"
               class="group p-2.5 rounded-xl border border-border/80 bg-card hover:border-emerald-500/60 hover:bg-emerald-500/10 transition text-left flex items-start gap-2.5 cursor-pointer"
             >
               <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
-                <Coins class="w-4 h-4" />
+                <Landmark class="w-4 h-4" />
               </div>
               <div class="min-w-0">
-                <div class="text-xs font-bold text-foreground truncate">4. AI FinOps Cockpit</div>
-                <div class="text-[10px] text-muted-foreground truncate">Tokens, Cost &amp; Outbox</div>
+                <div class="text-xs font-bold text-foreground truncate">4. Double-Entry Ledger</div>
+                <div class="text-[10px] text-muted-foreground truncate">AES-256 KYC &amp; 3-Way Recon</div>
               </div>
             </button>
           </div>
@@ -585,17 +591,14 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- VIEW: OVERVIEW (All 4 OMS Modules) -->
-        <template v-if="activeView === 'overview'">
-          <OrderInboxPanel
-            @open-ai-parser="openAiModal"
-            @print-waybill="openWaybillModal"
-            @inspect-order="openOrderInspector"
-          />
-          <InventoryMonitorPanel />
-          <StressSimulatorPanel />
-          <QueueMonitorPanel />
-        </template>
+        <!-- VIEW: OVERVIEW (Executive Command & Live Architecture Cockpit) -->
+        <ExecutiveOverviewPanel
+          v-if="activeView === 'overview'"
+          @navigate="(sec) => switchView(sec)"
+          @open-ai-parser="openAiModal"
+          @open-slip-validator="(ordId) => slipModalRef?.openModal(ordId)"
+          @inspect-order="openOrderInspector"
+        />
 
         <!-- VIEW: FOCUSED SINGLE MODULES (Super Clean on Mobile Tabs!) -->
         <OrderInboxPanel

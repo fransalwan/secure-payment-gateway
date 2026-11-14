@@ -29,7 +29,17 @@ func NewAccountService(repo *postgres.AccountRepository, cfg *config.Config) *Ac
 	}
 }
 
+func formatCiphertextPreview(enc string) string {
+	if len(enc) > 28 {
+		return enc[:28] + "..."
+	}
+	return enc
+}
+
 func (s *AccountService) CreateAccount(ctx context.Context, dto *domain.CreateAccountDTO) (*domain.Account, error) {
+	if dto.IdentityData == "" && dto.IdentityNumber != "" {
+		dto.IdentityData = dto.IdentityNumber
+	}
 	if dto.AccountNumber == "" || dto.HolderName == "" || dto.IdentityData == "" {
 		return nil, ErrInvalidAccountInput
 	}
@@ -51,6 +61,7 @@ func (s *AccountService) CreateAccount(ctx context.Context, dto *domain.CreateAc
 		AccountNumber:     dto.AccountNumber,
 		HolderName:        dto.HolderName,
 		EncryptedIdentity: encryptedIdentity,
+		CiphertextPreview: formatCiphertextPreview(encryptedIdentity),
 		Balance:           dto.InitialBalance,
 		Currency:          dto.Currency,
 		Version:           0,
@@ -66,15 +77,35 @@ func (s *AccountService) CreateAccount(ctx context.Context, dto *domain.CreateAc
 }
 
 func (s *AccountService) GetAccount(ctx context.Context, id uuid.UUID) (*domain.Account, error) {
-	return s.repo.GetByID(ctx, id)
+	acc, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	acc.CiphertextPreview = formatCiphertextPreview(acc.EncryptedIdentity)
+	if plain, decErr := crypto.AESGCMDecrypt(acc.EncryptedIdentity, s.cfg.AESSecretKey); decErr == nil {
+		acc.DecryptedIdentity = string(plain)
+	}
+	return acc, nil
 }
 
 func (s *AccountService) GetAccountByNumber(ctx context.Context, accNum string) (*domain.Account, error) {
-	return s.repo.GetByAccountNumber(ctx, accNum)
+	acc, err := s.repo.GetByAccountNumber(ctx, accNum)
+	if err != nil {
+		return nil, err
+	}
+	acc.CiphertextPreview = formatCiphertextPreview(acc.EncryptedIdentity)
+	return acc, nil
 }
 
 func (s *AccountService) ListAccounts(ctx context.Context) ([]*domain.Account, error) {
-	return s.repo.List(ctx, 50)
+	accounts, err := s.repo.List(ctx, 50)
+	if err != nil {
+		return nil, err
+	}
+	for _, acc := range accounts {
+		acc.CiphertextPreview = formatCiphertextPreview(acc.EncryptedIdentity)
+	}
+	return accounts, nil
 }
 
 

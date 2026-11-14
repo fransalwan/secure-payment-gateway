@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v1.4.0] - 2026-11-14 (Executive Architecture Cockpit, Connected Double-Entry Ledger & Human-in-the-Loop Fraud Resolution)
+
+### Added
+- **Executive Command & Live Architecture Cockpit (`frontend/src/components/ExecutiveOverviewPanel.vue`)**:
+  - Menggantikan tumpukan 4 panel duplikat pada tab `Command Overview` menjadi kokpit eksekutif 1 layar dengan visualisasi interaktif 4 tahap arsitektur (*Fast-ACK & dHash Gate &rarr; PostgreSQL ACID & Outbox &rarr; RabbitMQ/Redis Workers &rarr; Double-Entry Ledger & Multimodal AI*), daftar *Top 5 Priority Orders*, serta *Fraud Hold & Critical Stock Watchlist*.
+- **Connected Double-Entry Settlement & AES-256-GCM KYC Inspector (`CorePaymentLedgerView.vue`, `oms_repo.go`, `transfer_handler.go`)**:
+  - Seeding otomatis akun *Central Escrow* (`ACC-ESCROW-GATEWAY`) dan akun settlement merchant (`ACC-MERCH-8801`, `ACC-MERCH-8802`) beserta identitas NPWP/NIK terenkripsi `AES-256-GCM` dan tombol **"🔓 Dekripsi KYC"** *on-demand*.
+  - Integrasi otomatis: setiap pesanan OMS yang lunas (`PAID`) otomatis membukukan jurnal berpasangan `DEBIT` (Escrow) dan `CREDIT` (Merchant) ke `ledger_entries` serta merangkai hash kriptografis `SHA-256` di `audit_logs`.
+  - Simulator 1-Klik **"⚡ Simulasi Settlement (Double-Entry)"** (`POST /api/v1/simulator/ledger-transfer`) dan 2 preset rekonsiliasi CSV (*Preset 1: 100% Matched* vs *Preset 2: Simulasi Selisih MDR & Ghost Tx*) lengkap dengan tabel rincian *3-Way Match*.
+- **Human-in-the-Loop Fraud Hold Resolution (`OrderInspectorSheet.vue`, `OrderInboxPanel.vue`, `oms_repo.go`)**:
+  - Alur keputusan manual untuk pesanan berstatus `SUSPICIOUS_HOLD`: **Approve Override (&rarr; `PAID`)** atau **Reject Fraud & Release Stock (&rarr; `CANCELLED` + mengembalikan `reserved_stock` ke `available_stock`)**.
+- **Auto-Rendered BI Distribution Chart & Side-by-Side Vision Slip Comparison (`AiReportingPanel.vue`, `PaymentSlipModal.vue`)**:
+  - Grafik batang visual otomatis di atas tabel hasil query Text-to-SQL dan kartu perbandingan berdampingan (*Data Tagihan Order vs Ekstraksi Vision AI*).
+
+---
+
 ## [v1.3.0] - 2026-11-14 (JMC IT Consultant Assessment & Enterprise Compliance Release)
 
 ### Added

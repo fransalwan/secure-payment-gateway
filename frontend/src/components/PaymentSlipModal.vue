@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { toast } from 'vue-sonner'
 import ResponsiveDialog from './ui/ResponsiveDialog.vue'
 import Button from './ui/Button.vue'
@@ -40,10 +40,16 @@ interface VerificationResult {
   tamper_detected?: boolean
   confidence_score?: number
   rejection_reason?: string
+  image_phash?: string
+  is_duplicate_image?: boolean
   latency_ms?: number
 }
 
 const lastResult = ref<VerificationResult | null>(null)
+
+const selectedOrderObj = computed(() =>
+  store.orders.find((o) => o.id === selectedOrderID.value) || null,
+)
 
 function openModal(preselectedOrderID?: string) {
   isOpen.value = true
@@ -321,7 +327,7 @@ defineExpose({
           ? 'border-emerald-200 bg-emerald-50/40 dark:border-emerald-950 dark:bg-emerald-950/20'
           : 'border-amber-200 bg-amber-50/40 dark:border-amber-950 dark:bg-amber-950/20'"
       >
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between flex-wrap gap-2">
           <div class="flex items-center gap-2">
             <Badge :variant="lastResult.status === 'VERIFIED' ? 'emerald' : 'amber'">
               {{ lastResult.status === 'VERIFIED' ? 'VERIFIED (PAID)' : 'SUSPICIOUS HOLD' }}
@@ -331,8 +337,51 @@ defineExpose({
             </span>
           </div>
           <span class="text-[11px] font-mono text-slate-400">
-            Proof ID: {{ (lastResult.id || lastResult.proof_id)?.substring(0, 8) }}
+            dHash: {{ lastResult.image_phash || '64-bit OK' }} · Proof: {{ (lastResult.id || lastResult.proof_id)?.substring(0, 8) }}
           </span>
+        </div>
+
+        <!-- Side-by-Side Comparison: Expected Order vs Vision AI Extracted -->
+        <div v-if="selectedOrderObj" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+          <div class="rounded-lg bg-white/80 dark:bg-slate-900/70 p-3 border border-slate-200/70 dark:border-slate-800 space-y-1">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Data Tagihan Order (Expected)
+            </div>
+            <div class="font-mono font-bold text-slate-900 dark:text-slate-100">
+              {{ selectedOrderObj.order_number }}
+            </div>
+            <div class="text-slate-600 dark:text-slate-300">
+              Pembeli: <strong>{{ selectedOrderObj.customer_name }}</strong>
+            </div>
+            <div class="font-mono font-extrabold text-sm text-indigo-600 dark:text-indigo-400">
+              Tagihan: {{ formatIDR(selectedOrderObj.total_amount) }}
+            </div>
+          </div>
+
+          <div class="rounded-lg bg-white/80 dark:bg-slate-900/70 p-3 border border-slate-200/70 dark:border-slate-800 space-y-1">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Ekstraksi Multimodal Vision AI (Actual)
+            </div>
+            <div class="font-mono font-bold text-slate-900 dark:text-slate-100">
+              {{ lastResult.bank_name || '-' }} · {{ lastResult.reference_number || '-' }}
+            </div>
+            <div class="text-slate-600 dark:text-slate-300">
+              Pengirim: <strong>{{ lastResult.sender_name || '-' }}</strong>
+            </div>
+            <div
+              class="font-mono font-extrabold text-sm"
+              :class="
+                Math.abs((lastResult.amount || 0) - selectedOrderObj.total_amount) < 1
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-rose-600 dark:text-rose-400'
+              "
+            >
+              Struk: {{ formatIDR(lastResult.amount || 0) }}
+              <span class="text-[10px] ml-1">
+                ({{ Math.abs((lastResult.amount || 0) - selectedOrderObj.total_amount) < 1 ? 'MATCH 100%' : 'SELISIH NOMINAL!' }})
+              </span>
+            </div>
+          </div>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">

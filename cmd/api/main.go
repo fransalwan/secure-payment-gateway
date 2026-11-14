@@ -98,6 +98,10 @@ func main() {
 			}
 		}
 	}
+	omsRepo.SetAESSecretKey(cfg.AESSecretKey)
+	if seedErr := omsRepo.SeedCorePaymentLedgerBaseline(ctx); seedErr != nil {
+		log.Warn().Err(seedErr).Msg("Core payment ledger baseline seed warning")
+	}
 
 	// Services
 	accountService := service.NewAccountService(accountRepo, cfg)
@@ -224,6 +228,7 @@ func main() {
 		r.Post("/simulator/chaos-mode", omsHandler.SetChaosMode)
 		r.Post("/simulator/reset-demo", omsHandler.ResetDemoState)
 		r.Post("/dashboard/reset-demo", omsHandler.ResetDemoState)
+		r.Post("/simulator/ledger-transfer", transferHandler.SimulateSettlementTransfer)
 		r.Post("/queue/jobs/{id}/retry", omsHandler.ManualRetryJob)
 
 		// --- Core Payment Gateway & Double-Entry Ledger Endpoints ---

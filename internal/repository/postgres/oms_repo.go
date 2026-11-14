@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fransalwan/secure-payment-gateway/internal/domain"
+	"github.com/fransalwan/secure-payment-gateway/pkg/crypto"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,11 +24,21 @@ var (
 )
 
 type OMSRepository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	aesKey []byte
 }
 
 func NewOMSRepository(pool *pgxpool.Pool) *OMSRepository {
-	return &OMSRepository{pool: pool}
+	return &OMSRepository{
+		pool:   pool,
+		aesKey: []byte("0123456789abcdef0123456789abcdef"),
+	}
+}
+
+func (r *OMSRepository) SetAESSecretKey(key []byte) {
+	if len(key) == 32 {
+		r.aesKey = key
+	}
 }
 
 // EnsureSchema idempotently applies the OMS SQL migration file if tables do not exist yet.
@@ -409,6 +420,18 @@ func (r *OMSRepository) MarkOrderPaidAtomic(ctx context.Context, orderIDStr stri
 		return nil, false, fmt.Errorf("failed to mark order PAID: %w", err)
 	}
 
+	// If order had a SUSPICIOUS_HOLD payment proof, mark it VERIFIED upon manual override or webhook settlement
+	_, _ = tx.Exec(ctx, `
+		UPDATE payment_proofs
+		SET status = 'VERIFIED',
+		    rejection_reason = 'Approved via Human-in-the-Loop / Verified Settlement',
+		    processed_at = $1
+		WHERE order_id = $2 AND status = 'SUSPICIOUS_HOLD'
+	`, now, ord.ID)
+
+	// Automatically record Double-Entry Ledger Settlement (Escrow DEBIT -> Merchant CREDIT)
+	r.recordOrderLedgerSettlementTx(ctx, tx, &ord, now)
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, false, fmt.Errorf("failed to commit payment settlement: %w", err)
 	}
@@ -419,7 +442,73 @@ func (r *OMSRepository) MarkOrderPaidAtomic(ctx context.Context, orderIDStr stri
 	return &ord, false, nil
 }
 
-// CancelOrderAtomic cancels a PENDING_PAYMENT order and releases reserved_stock back to available_stock.
+func (r *OMSRepository) recordOrderLedgerSettlementTx(ctx context.Context, tx pgx.Tx, ord *domain.Order, now time.Time) {
+	escrowID := uuid.MustParse("e0000000-0000-0000-0000-000000000001")
+	destAccID := uuid.MustParse("e1111111-1111-1111-1111-111111111111")
+	if ord.MerchantID.String() == "22222222-2222-2222-2222-222222222222" {
+		destAccID = uuid.MustParse("e2222222-2222-2222-2222-222222222222")
+	}
+
+	amountInt := int64(ord.TotalAmount)
+	if amountInt <= 0 {
+		return
+	}
+
+	refID := fmt.Sprintf("REF-%s", ord.OrderNumber)
+	var existingTxID uuid.UUID
+	if err := tx.QueryRow(ctx, `SELECT id FROM transactions WHERE reference_id = $1`, refID).Scan(&existingTxID); err == nil {
+		return // Already recorded
+	}
+
+	var escrowBal, destBal int64
+	if err := tx.QueryRow(ctx, `SELECT balance FROM accounts WHERE id = $1 FOR UPDATE`, escrowID).Scan(&escrowBal); err != nil {
+		return
+	}
+	if err := tx.QueryRow(ctx, `SELECT balance FROM accounts WHERE id = $1 FOR UPDATE`, destAccID).Scan(&destBal); err != nil {
+		return
+	}
+
+	newEscrowBal := escrowBal - amountInt
+	newDestBal := destBal + amountInt
+
+	_, _ = tx.Exec(ctx, `UPDATE accounts SET balance = $1, version = version + 1, updated_at = $2 WHERE id = $3`, newEscrowBal, now, escrowID)
+	_, _ = tx.Exec(ctx, `UPDATE accounts SET balance = $1, version = version + 1, updated_at = $2 WHERE id = $3`, newDestBal, now, destAccID)
+
+	txID := uuid.New()
+	desc := fmt.Sprintf("OMS Auto-Settlement %s (%s - %s)", ord.OrderNumber, ord.Channel, ord.CustomerName)
+	_, err := tx.Exec(ctx, `
+		INSERT INTO transactions (id, reference_id, idempotency_key, source_account_id, destination_account_id, amount, currency, status, description, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, 'IDR', 'SETTLED', $7, $8, $8)
+	`, txID, refID, "idem-"+ord.OrderNumber, escrowID, destAccID, amountInt, desc, now)
+	if err != nil {
+		return
+	}
+
+	_, _ = tx.Exec(ctx, `
+		INSERT INTO ledger_entries (id, transaction_id, account_id, entry_type, amount, balance_after, created_at)
+		VALUES ($1, $2, $3, 'DEBIT', $4, $5, $6),
+		       ($7, $2, $8, 'CREDIT', $4, $9, $6)
+	`, uuid.New(), txID, escrowID, amountInt, newEscrowBal, now, uuid.New(), destAccID, newDestBal)
+
+	var lastHash string
+	_ = tx.QueryRow(ctx, `SELECT current_hash FROM audit_logs ORDER BY id DESC LIMIT 1`).Scan(&lastHash)
+	if lastHash == "" {
+		lastHash = "0000000000000000000000000000000000000000000000000000000000000000"
+	}
+	auditPayload, _ := json.Marshal(map[string]interface{}{
+		"transaction_id": txID,
+		"reference_id":   refID,
+		"order_number":   ord.OrderNumber,
+		"amount":         amountInt,
+	})
+	currentHash := crypto.CalculateAuditHash(lastHash, auditPayload)
+	_, _ = tx.Exec(ctx, `
+		INSERT INTO audit_logs (entity_type, entity_id, action, payload, previous_hash, current_hash, created_at)
+		VALUES ('TRANSACTION', $1, 'SETTLED', $2, $3, $4, $5)
+	`, txID.String(), auditPayload, lastHash, currentHash, now)
+}
+
+// CancelOrderAtomic cancels a PENDING_PAYMENT or SUSPICIOUS_HOLD order and releases reserved_stock back to available_stock.
 func (r *OMSRepository) CancelOrderAtomic(ctx context.Context, orderID uuid.UUID) (*domain.Order, error) {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -447,8 +536,8 @@ func (r *OMSRepository) CancelOrderAtomic(ctx context.Context, orderID uuid.UUID
 		}
 		return nil, err
 	}
-	if ord.Status != domain.OrderStatusPendingPayment {
-		return nil, fmt.Errorf("%w: only PENDING_PAYMENT orders can be cancelled (current: %s)", ErrInvalidOrderTransition, ord.Status)
+	if ord.Status != domain.OrderStatusPendingPayment && ord.Status != domain.OrderStatusSuspiciousHold {
+		return nil, fmt.Errorf("%w: only PENDING_PAYMENT or SUSPICIOUS_HOLD orders can be cancelled (current: %s)", ErrInvalidOrderTransition, ord.Status)
 	}
 
 	rows, err := tx.Query(ctx, `SELECT product_id, qty FROM order_items WHERE order_id = $1 ORDER BY product_id ASC`, ord.ID)
@@ -491,6 +580,14 @@ func (r *OMSRepository) CancelOrderAtomic(ctx context.Context, orderID uuid.UUID
 	if err != nil {
 		return nil, err
 	}
+
+	_, _ = tx.Exec(ctx, `
+		UPDATE payment_proofs
+		SET status = 'REJECTED',
+		    rejection_reason = 'Confirmed Fraud / Cancelled by Reviewer — Reserved Stock Released',
+		    processed_at = $1
+		WHERE order_id = $2 AND status = 'SUSPICIOUS_HOLD'
+	`, now, ord.ID)
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
@@ -856,6 +953,10 @@ func (r *OMSRepository) ListSystemErrors(ctx context.Context, limit int) ([]doma
 // ResetAndSeedDemoState resets the core inventory, sample demo orders, and test logs
 // back to their pristine initial demo baseline for seamless evaluator testing.
 func (r *OMSRepository) ResetAndSeedDemoState(ctx context.Context) error {
+	if err := r.SeedCorePaymentLedgerBaseline(ctx); err != nil {
+		return err
+	}
+
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -867,7 +968,7 @@ func (r *OMSRepository) ResetAndSeedDemoState(ctx context.Context) error {
 		`UPDATE products SET available_stock = 1, reserved_stock = 2, sold_stock = 48, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111101'`,
 		`UPDATE products SET available_stock = 24, reserved_stock = 1, sold_stock = 35, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111102'`,
 		`UPDATE products SET available_stock = 14, reserved_stock = 1, sold_stock = 62, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111103'`,
-		`UPDATE products SET available_stock = 18, reserved_stock = 0, sold_stock = 29, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111104'`,
+		`UPDATE products SET available_stock = 18, reserved_stock = 1, sold_stock = 29, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111104'`,
 		`UPDATE products SET available_stock = 40, reserved_stock = 3, sold_stock = 91, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111105'`,
 		`UPDATE products SET available_stock = 5, reserved_stock = 1, sold_stock = 19, version = 1 WHERE id = 'a1111111-1111-1111-1111-111111111106'`,
 		// 2. Reset Merchant 2 Products
@@ -876,14 +977,15 @@ func (r *OMSRepository) ResetAndSeedDemoState(ctx context.Context) error {
 		// 3. Reset standard demo orders to initial states
 		`UPDATE orders SET status = 'READY_TO_SHIP' WHERE id = 'b1111111-1111-1111-1111-111111111101'`,
 		`UPDATE orders SET status = 'PENDING_PAYMENT' WHERE id = 'b1111111-1111-1111-1111-111111111102'`,
-		`UPDATE orders SET status = 'PAID' WHERE id = 'b1111111-1111-1111-1111-111111111103'`,
+		`UPDATE orders SET status = 'READY_TO_SHIP' WHERE id = 'b1111111-1111-1111-1111-111111111103'`,
 		`UPDATE orders SET status = 'PENDING_PAYMENT' WHERE id = 'b1111111-1111-1111-1111-111111111104'`,
-		`UPDATE orders SET status = 'COMPLETED' WHERE id = 'b1111111-1111-1111-1111-111111111105'`,
+		`UPDATE orders SET status = 'SUSPICIOUS_HOLD' WHERE id = 'b1111111-1111-1111-1111-111111111105'`,
 		// 4. Reset sample proof verification status
-		`UPDATE payment_proofs SET status = 'VERIFIED' WHERE id = 'c1111111-1111-1111-1111-111111111101'`,
-		`UPDATE payment_proofs SET status = 'SUSPICIOUS_HOLD' WHERE id = 'c1111111-1111-1111-1111-111111111102'`,
-		// 5. Clean unresolved error logs for pristine state
+		`UPDATE payment_proofs SET status = 'VERIFIED' WHERE id = 'p1111111-1111-1111-1111-111111111101'`,
+		`UPDATE payment_proofs SET status = 'SUSPICIOUS_HOLD', rejection_reason = 'Tampering/photoshop manipulation detected in slip image: font alignment & pixel compression anomaly on nominal Rp 189.000' WHERE id = 'p1111111-1111-1111-1111-111111111102'`,
+		// 5. Clean resolved error logs & transient race simulation orders
 		`DELETE FROM system_error_logs WHERE resolved = TRUE`,
+		`DELETE FROM orders WHERE external_order_id LIKE 'RACE-%'`,
 	}
 
 	for _, q := range queries {
@@ -893,6 +995,215 @@ func (r *OMSRepository) ResetAndSeedDemoState(ctx context.Context) error {
 	}
 
 	return tx.Commit(ctx)
+}
+
+// SeedCorePaymentLedgerBaseline idempotently seeds AES-256-GCM encrypted merchant accounts,
+// double-entry ledger entries, hash-chained audit logs, and a SUSPICIOUS_HOLD fraud order for live demos.
+func (r *OMSRepository) SeedCorePaymentLedgerBaseline(ctx context.Context) error {
+	encEscrow, err := crypto.AESGCMEncrypt([]byte("NPWP-01.000.999.8-091.000 | SPG Central Clearing & Escrow Vault"), r.aesKey)
+	if err != nil {
+		return err
+	}
+	encM1, err := crypto.AESGCMEncrypt([]byte("NPWP-02.418.772.1-012.000 | NIK-3174051908950001 (Nusantara Apparel)"), r.aesKey)
+	if err != nil {
+		return err
+	}
+	encM2, err := crypto.AESGCMEncrypt([]byte("NPWP-03.912.441.5-044.000 | NIK-3273012411920003 (Kopi Senja Roastery)"), r.aesKey)
+	if err != nil {
+		return err
+	}
+
+	escrowID := uuid.MustParse("e0000000-0000-0000-0000-000000000001")
+	merch1AccID := uuid.MustParse("e1111111-1111-1111-1111-111111111111")
+	merch2AccID := uuid.MustParse("e2222222-2222-2222-2222-222222222222")
+
+	_, _ = r.pool.Exec(ctx, `
+		INSERT INTO accounts (id, account_number, holder_name, encrypted_identity, balance, currency, version)
+		VALUES
+			($1, 'ACC-ESCROW-GATEWAY', 'SPG Central Clearing & Escrow Vault', $2, 149033000, 'IDR', 3),
+			($3, 'ACC-MERCH-8801', 'Nusantara Apparel Official (Settlement)', $4, 15967000, 'IDR', 3),
+			($5, 'ACC-MERCH-8802', 'Kopi Senja Roastery (Settlement)', $6, 8450000, 'IDR', 1)
+		ON CONFLICT (account_number) DO UPDATE
+		SET encrypted_identity = EXCLUDED.encrypted_identity
+	`, escrowID, encEscrow, merch1AccID, encM1, merch2AccID, encM2)
+
+	// Seed 5th Order (SUSPICIOUS_HOLD Fraud Hold Demo Case)
+	_, _ = r.pool.Exec(ctx, `
+		INSERT INTO orders (
+			id, merchant_id, order_number, channel, external_order_id,
+			customer_name, customer_phone, shipping_address, courier_code,
+			status, total_amount, waybill_number, payment_url, payment_expires_at, created_at
+		) VALUES (
+			'b1111111-1111-1111-1111-111111111105',
+			'11111111-1111-1111-1111-111111111111',
+			'ORD-20261031-IG05',
+			'WHATSAPP_LIVE',
+			'WA-SUSPECT-7741',
+			'Budi Hartono',
+			'081900228811',
+			'Jl. Asia Afrika No. 65, Braga, Sumur Bandung, Kota Bandung 40111',
+			'SICEPAT',
+			'SUSPICIOUS_HOLD',
+			189000.00,
+			NULL,
+			'https://pay.spg-gateway.local/checkout/ORD-20261031-IG05',
+			NOW() + INTERVAL '20 hours',
+			NOW() - INTERVAL '15 minutes'
+		) ON CONFLICT (order_number) DO NOTHING
+	`)
+
+	_, _ = r.pool.Exec(ctx, `
+		INSERT INTO order_items (id, order_id, product_id, sku, product_name, qty, unit_price, subtotal)
+		VALUES (
+			'c1111111-1111-1111-1111-111111111107',
+			'b1111111-1111-1111-1111-111111111105',
+			'a1111111-1111-1111-1111-111111111104',
+			'SKU-CHINO-KHK-32',
+			'Celana Chino Slimfit Khaki 32',
+			1, 189000.00, 189000.00
+		) ON CONFLICT (id) DO NOTHING
+	`)
+
+	// Seed Verified & Suspicious Payment Proofs
+	_, _ = r.pool.Exec(ctx, `
+		INSERT INTO payment_proofs (
+			id, order_id, merchant_id, file_name, bank_name, sender_name,
+			amount, reference_number, transfer_time, tamper_detected,
+			confidence_score, status, rejection_reason, image_phash, is_duplicate_image, processed_at
+		) VALUES
+		(
+			'p1111111-1111-1111-1111-111111111101',
+			'b1111111-1111-1111-1111-111111111101',
+			'11111111-1111-1111-1111-111111111111',
+			'bca-transfer-rina-324000.jpg',
+			'BCA',
+			'RINA KUSUMA',
+			324000.00,
+			'REF-BCA-2026-1001',
+			NOW() - INTERVAL '41 minutes',
+			FALSE,
+			0.9750,
+			'VERIFIED',
+			'',
+			'a4c3910e5572b811',
+			FALSE,
+			NOW() - INTERVAL '40 minutes'
+		),
+		(
+			'p1111111-1111-1111-1111-111111111102',
+			'b1111111-1111-1111-1111-111111111105',
+			'11111111-1111-1111-1111-111111111111',
+			'slip-edited-budi-189k.png',
+			'Mandiri',
+			'BUDI HARTONO',
+			89000.00,
+			'REF-MDR-FAKE-9912',
+			NOW() - INTERVAL '14 minutes',
+			TRUE,
+			0.4200,
+			'SUSPICIOUS_HOLD',
+			'Tampering/photoshop manipulation detected in slip image: font alignment & pixel compression anomaly on nominal Rp 189.000 (Extracted Rp 89.000)',
+			'f8a9c2e190b471d3',
+			FALSE,
+			NOW() - INTERVAL '14 minutes'
+		)
+		ON CONFLICT (id) DO NOTHING
+	`)
+
+	// Seed 3 Baseline Settled Transactions + 6 Double-Entry Ledger Rows + 3 Hash-Chained Audit Logs
+	type seedTx struct {
+		txID        uuid.UUID
+		debitID     uuid.UUID
+		creditID    uuid.UUID
+		refID       string
+		idemKey     string
+		amount      int64
+		escrowAfter int64
+		merchAfter  int64
+		desc        string
+		minsAgo     int
+	}
+
+	seeds := []seedTx{
+		{
+			txID:        uuid.MustParse("f1111111-1111-1111-1111-111111111101"),
+			debitID:     uuid.MustParse("f2111111-1111-1111-1111-111111111101"),
+			creditID:    uuid.MustParse("f3111111-1111-1111-1111-111111111101"),
+			refID:       "REF-BCA-2026-1001",
+			idemKey:     "idem-seed-bca-1001",
+			amount:      324000,
+			escrowAfter: 149676000,
+			merchAfter:  15324000,
+			desc:        "OMS Settlement ORD-20261031-WA01 (WhatsApp Live - Rina Kusuma)",
+			minsAgo:     40,
+		},
+		{
+			txID:        uuid.MustParse("f1111111-1111-1111-1111-111111111102"),
+			debitID:     uuid.MustParse("f2111111-1111-1111-1111-111111111102"),
+			creditID:    uuid.MustParse("f3111111-1111-1111-1111-111111111102"),
+			refID:       "REF-BCA-2026-1002",
+			idemKey:     "idem-seed-bca-1002",
+			amount:      394000,
+			escrowAfter: 149282000,
+			merchAfter:  15718000,
+			desc:        "OMS Settlement ORD-20261031-TTS3 (TikTok Shop - Nadia Putri)",
+			minsAgo:     30,
+		},
+		{
+			txID:        uuid.MustParse("f1111111-1111-1111-1111-111111111103"),
+			debitID:     uuid.MustParse("f2111111-1111-1111-1111-111111111103"),
+			creditID:    uuid.MustParse("f3111111-1111-1111-1111-111111111103"),
+			refID:       "REF-BCA-2026-1003",
+			idemKey:     "idem-seed-bca-1003",
+			amount:      249000,
+			escrowAfter: 149033000,
+			merchAfter:  15967000,
+			desc:        "OMS Batch Settlement ORD-20261031-WEB0 (Web Store - Hendra Wijaya)",
+			minsAgo:     20,
+		},
+	}
+
+	prevHash := "0000000000000000000000000000000000000000000000000000000000000000"
+	for _, s := range seeds {
+		var exists uuid.UUID
+		if err := r.pool.QueryRow(ctx, `SELECT id FROM transactions WHERE reference_id = $1`, s.refID).Scan(&exists); err == nil {
+			continue
+		}
+
+		ts := time.Now().UTC().Add(-time.Duration(s.minsAgo) * time.Minute)
+		_, err := r.pool.Exec(ctx, `
+			INSERT INTO transactions (id, reference_id, idempotency_key, source_account_id, destination_account_id, amount, currency, status, description, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, 'IDR', 'SETTLED', $7, $8, $8)
+			ON CONFLICT (reference_id) DO NOTHING
+		`, s.txID, s.refID, s.idemKey, escrowID, merch1AccID, s.amount, s.desc, ts)
+		if err != nil {
+			continue
+		}
+
+		_, _ = r.pool.Exec(ctx, `
+			INSERT INTO ledger_entries (id, transaction_id, account_id, entry_type, amount, balance_after, created_at)
+			VALUES ($1, $2, $3, 'DEBIT', $4, $5, $6),
+			       ($7, $2, $8, 'CREDIT', $4, $9, $6)
+			ON CONFLICT (id) DO NOTHING
+		`, s.debitID, s.txID, escrowID, s.amount, s.escrowAfter, ts, s.creditID, merch1AccID, s.merchAfter)
+
+		payload, _ := json.Marshal(map[string]interface{}{
+			"transaction_id": s.txID,
+			"reference_id":   s.refID,
+			"source":         escrowID,
+			"destination":    merch1AccID,
+			"amount":         s.amount,
+			"time":           ts,
+		})
+		currHash := crypto.CalculateAuditHash(prevHash, payload)
+		_, _ = r.pool.Exec(ctx, `
+			INSERT INTO audit_logs (entity_type, entity_id, action, payload, previous_hash, current_hash, created_at)
+			VALUES ('TRANSACTION', $1, 'SETTLED', $2, $3, $4, $5)
+		`, s.txID.String(), payload, prevHash, currHash, ts)
+		prevHash = currHash
+	}
+
+	return nil
 }
 
 

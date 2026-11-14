@@ -12,6 +12,8 @@ type Account struct {
 	AccountNumber     string    `json:"account_number"`
 	HolderName        string    `json:"holder_name"`
 	EncryptedIdentity string    `json:"-"`
+	CiphertextPreview string    `json:"ciphertext_preview,omitempty"`
+	DecryptedIdentity string    `json:"decrypted_identity,omitempty"`
 	Balance           int64     `json:"balance"`
 	Currency          string    `json:"currency"`
 	Version           int       `json:"version"`
@@ -23,6 +25,7 @@ type CreateAccountDTO struct {
 	AccountNumber  string `json:"account_number"`
 	HolderName     string `json:"holder_name"`
 	IdentityData   string `json:"identity_data"`
+	IdentityNumber string `json:"identity_number"`
 	InitialBalance int64  `json:"initial_balance"`
 	Currency       string `json:"currency"`
 }

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import Button from './ui/Button.vue'
 import Badge from './ui/Badge.vue'
+import { formatIDR } from '../lib/utils'
 import {
   Sparkles,
   Database,
@@ -122,6 +123,47 @@ function exportQueryResultCSV() {
 
   toast.success('Hasil Query Berhasil Diexport ke CSV!')
 }
+
+// Compute interactive visual chart bars from the first label column & primary numeric metric column
+const chartMetrics = computed(() => {
+  if (!reportResult.value || !reportResult.value.rows || reportResult.value.rows.length === 0) {
+    return null
+  }
+  const cols = reportResult.value.columns
+  if (cols.length < 2) return null
+
+  const labelCol = cols[0]
+  // Prefer revenue / gmv / amount / count column
+  const metricCol =
+    cols.find((c) => /gmv|revenue|omset|amount|nominal|value/i.test(c)) ||
+    cols.find((c, idx) => idx > 0 && typeof reportResult.value!.rows[0]?.[c] === 'number') ||
+    cols[cols.length - 1]
+
+  const isCurrency = /gmv|revenue|omset|amount|nominal|price|value/i.test(metricCol)
+
+  const items = reportResult.value.rows.slice(0, 8).map((r) => {
+    const rawVal = Number(r[metricCol]) || 0
+    return {
+      label: String(r[labelCol] ?? '-'),
+      value: rawVal,
+      formatted: isCurrency ? formatIDR(rawVal) : rawVal.toLocaleString('id-ID'),
+    }
+  })
+
+  const maxVal = Math.max(1, ...items.map((i) => i.value))
+  return {
+    labelCol,
+    metricCol,
+    items: items.map((i) => ({
+      ...i,
+      pct: Math.max(6, Math.round((i.value / maxVal) * 100)),
+    })),
+  }
+})
+
+onMounted(() => {
+  runQuery()
+})
 </script>
 
 <template>
@@ -250,6 +292,47 @@ function exportQueryResultCSV() {
         <div v-if="reportResult.explanation" class="mt-3 pt-2.5 border-t border-slate-800/80 text-xs text-slate-400 flex items-start gap-2">
           <Database class="w-3.5 h-3.5 shrink-0 mt-0.5 text-indigo-400" />
           <span>{{ reportResult.explanation }}</span>
+        </div>
+      </div>
+
+      <!-- Interactive Visual Distribution Chart -->
+      <div
+        v-if="chartMetrics && chartMetrics.items.length > 0"
+        class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-sm space-y-3"
+      >
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <BarChart3 class="w-4 h-4 text-indigo-500" />
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+              Visualisasi Distribusi: {{ chartMetrics.metricCol }} per {{ chartMetrics.labelCol }}
+            </span>
+          </div>
+          <Badge variant="indigo" class="font-mono text-[10px]">
+            Auto-Rendered BI Chart
+          </Badge>
+        </div>
+
+        <div class="space-y-2.5 pt-1">
+          <div
+            v-for="(bar, bIdx) in chartMetrics.items"
+            :key="bIdx"
+            class="space-y-1 text-xs"
+          >
+            <div class="flex items-center justify-between font-mono">
+              <span class="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[60%]">
+                {{ bar.label }}
+              </span>
+              <span class="font-extrabold text-indigo-600 dark:text-indigo-400 tabular-nums">
+                {{ bar.formatted }}
+              </span>
+            </div>
+            <div class="h-2.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+              <div
+                class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-500"
+                :style="{ width: `${bar.pct}%` }"
+              ></div>
+            </div>
+          </div>
         </div>
       </div>
 
