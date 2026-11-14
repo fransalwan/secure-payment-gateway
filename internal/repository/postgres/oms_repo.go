@@ -981,8 +981,8 @@ func (r *OMSRepository) ResetAndSeedDemoState(ctx context.Context) error {
 		`UPDATE orders SET status = 'PENDING_PAYMENT' WHERE id = 'b1111111-1111-1111-1111-111111111104'`,
 		`UPDATE orders SET status = 'SUSPICIOUS_HOLD' WHERE id = 'b1111111-1111-1111-1111-111111111105'`,
 		// 4. Reset sample proof verification status
-		`UPDATE payment_proofs SET status = 'VERIFIED' WHERE id = 'p1111111-1111-1111-1111-111111111101'`,
-		`UPDATE payment_proofs SET status = 'SUSPICIOUS_HOLD', rejection_reason = 'Tampering/photoshop manipulation detected in slip image: font alignment & pixel compression anomaly on nominal Rp 189.000' WHERE id = 'p1111111-1111-1111-1111-111111111102'`,
+		`UPDATE payment_proofs SET status = 'VERIFIED' WHERE id = 'd1111111-1111-1111-1111-111111111101'`,
+		`UPDATE payment_proofs SET status = 'SUSPICIOUS_HOLD', rejection_reason = 'Tampering/photoshop manipulation detected in slip image: font alignment & pixel compression anomaly on nominal Rp 189.000' WHERE id = 'd1111111-1111-1111-1111-111111111102'`,
 		// 5. Clean resolved error logs & transient race simulation orders
 		`DELETE FROM system_error_logs WHERE resolved = TRUE`,
 		`DELETE FROM orders WHERE external_order_id LIKE 'RACE-%'`,
@@ -1072,7 +1072,7 @@ func (r *OMSRepository) SeedCorePaymentLedgerBaseline(ctx context.Context) error
 			confidence_score, status, rejection_reason, image_phash, is_duplicate_image, processed_at
 		) VALUES
 		(
-			'p1111111-1111-1111-1111-111111111101',
+			'd1111111-1111-1111-1111-111111111101',
 			'b1111111-1111-1111-1111-111111111101',
 			'11111111-1111-1111-1111-111111111111',
 			'bca-transfer-rina-324000.jpg',
@@ -1090,7 +1090,7 @@ func (r *OMSRepository) SeedCorePaymentLedgerBaseline(ctx context.Context) error
 			NOW() - INTERVAL '40 minutes'
 		),
 		(
-			'p1111111-1111-1111-1111-111111111102',
+			'd1111111-1111-1111-1111-111111111102',
 			'b1111111-1111-1111-1111-111111111105',
 			'11111111-1111-1111-1111-111111111111',
 			'slip-edited-budi-189k.png',
